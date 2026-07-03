@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -41,7 +42,14 @@ export default function BuscaAnimeScreen() {
   function abrirAnime(anime) {
     router.push({
       pathname: "/episodios",
-      params: { site, url: anime.url_detalhes, titulo: anime.titulo },
+      // Capa e sinopse já vêm da busca; a tela de episódios só exibe.
+      params: {
+        site,
+        url: anime.url_detalhes,
+        titulo: anime.titulo,
+        imagem: anime.imagem || "",
+        sinopse: anime.sinopse || "",
+      },
     });
   }
 
@@ -95,8 +103,18 @@ export default function BuscaAnimeScreen() {
         keyExtractor={(item, i) => item.url_detalhes + i}
         renderItem={({ item }) => (
           <Pressable style={styles.cartao} onPress={() => abrirAnime(item)}>
-            <Text style={styles.cartaoTitulo}>{item.titulo}</Text>
-            {!!item.ano && <Text style={styles.cartaoAno}>{item.ano}</Text>}
+            {!!item.imagem && (
+              <Image source={{ uri: item.imagem }} style={styles.capa} />
+            )}
+            <View style={styles.cartaoTextos}>
+              <Text style={styles.cartaoTitulo}>{item.titulo}</Text>
+              {!!item.ano && <Text style={styles.cartaoAno}>{item.ano}</Text>}
+              {!!item.sinopse && (
+                <Text style={styles.cartaoSinopse} numberOfLines={2}>
+                  {item.sinopse}
+                </Text>
+              )}
+            </View>
           </Pressable>
         )}
       />
@@ -139,13 +157,23 @@ const styles = StyleSheet.create({
   aviso: { color: cores.textoFraco, textAlign: "center" },
   erro: { color: cores.erro, textAlign: "center", marginVertical: 12 },
   cartao: {
+    flexDirection: "row",
     backgroundColor: cores.cartao,
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: cores.borda,
+    gap: 12,
   },
+  capa: {
+    width: 64,
+    height: 90,
+    borderRadius: 8,
+    backgroundColor: cores.cartaoAtivo,
+  },
+  cartaoTextos: { flex: 1, justifyContent: "center" },
   cartaoTitulo: { color: cores.texto, fontSize: 16, fontWeight: "600" },
   cartaoAno: { color: cores.textoFraco, marginTop: 4 },
+  cartaoSinopse: { color: cores.textoFraco, fontSize: 12, marginTop: 6 },
 });

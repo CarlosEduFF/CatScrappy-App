@@ -1,9 +1,11 @@
-// app/episodios.js — episódios de um anime: assistir, baixar (único/temporada/intervalo).
+// app/episodios.js — episódios de um anime: capa/sinopse, assistir e baixar
+// (único no player; temporada/intervalo aqui).
 
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -18,11 +20,12 @@ import ProgressoOverlay from "../src/ProgressoOverlay";
 import { cores } from "../src/theme";
 
 export default function EpisodiosScreen() {
-  const { site, url, titulo } = useLocalSearchParams();
+  const { site, url, titulo, imagem, sinopse } = useLocalSearchParams();
   const router = useRouter();
   const [episodios, setEpisodios] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  const [sinopseAberta, setSinopseAberta] = useState(false);
   const dl = useDownload();
 
   useEffect(() => {
@@ -82,6 +85,27 @@ export default function EpisodiosScreen() {
 
       {erro && <Text style={styles.erro}>{erro}</Text>}
 
+      {!carregando && !erro && (!!imagem || !!sinopse) && (
+        <View style={styles.ficha}>
+          {!!imagem && <Image source={{ uri: imagem }} style={styles.capa} />}
+          <View style={styles.fichaTextos}>
+            <Text style={styles.contagem}>
+              {episodios.length} episódio{episodios.length === 1 ? "" : "s"}
+            </Text>
+            {!!sinopse && (
+              <Pressable onPress={() => setSinopseAberta((v) => !v)}>
+                <Text
+                  style={styles.sinopse}
+                  numberOfLines={sinopseAberta ? undefined : 3}
+                >
+                  {sinopse}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      )}
+
       {!carregando && !erro && episodios.length > 0 && (
         <View style={styles.acoes}>
           <Pressable style={styles.acao} onPress={baixarTemporada}>
@@ -118,6 +142,25 @@ const styles = StyleSheet.create({
   centro: { alignItems: "center", padding: 24, gap: 12 },
   aviso: { color: cores.textoFraco },
   erro: { color: cores.erro, textAlign: "center", marginVertical: 12 },
+  ficha: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 14,
+    backgroundColor: cores.cartao,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  capa: {
+    width: 84,
+    height: 118,
+    borderRadius: 8,
+    backgroundColor: cores.cartaoAtivo,
+  },
+  fichaTextos: { flex: 1 },
+  contagem: { color: cores.primaria, fontWeight: "700", marginBottom: 6 },
+  sinopse: { color: cores.textoFraco, fontSize: 13, lineHeight: 18 },
   acoes: { flexDirection: "row", gap: 10, marginBottom: 14 },
   acao: {
     flex: 1,
