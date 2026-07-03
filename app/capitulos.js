@@ -71,7 +71,13 @@ export default function CapitulosScreen() {
   function ler(cap) {
     router.push({
       pathname: "/leitor",
-      params: { capituloId: cap.id, titulo: rotuloCap(cap) },
+      // "numero" nomeia o PDF e "manga" a subpasta, se baixar pelo leitor.
+      params: {
+        capituloId: cap.id,
+        titulo: rotuloCap(cap),
+        numero: cap.numero,
+        manga: titulo,
+      },
     });
   }
 

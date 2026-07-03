@@ -1,4 +1,5 @@
 // app/leitor.js — leitor de capítulo: páginas em rolagem vertical.
+// O ⬇️ no header baixa o capítulo atual como PDF na pasta do mangá.
 
 import { useEffect, useState } from "react";
 import {
@@ -6,22 +7,49 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useLocalSearchParams, Stack } from "expo-router";
 import { obterPaginas } from "../src/api";
+import { baixarCapitulos } from "../src/downloads";
+import { useDownload } from "../src/useDownload";
+import ProgressoOverlay from "../src/ProgressoOverlay";
 import { cores } from "../src/theme";
 
 const LARGURA = Dimensions.get("window").width;
 
 export default function LeitorScreen() {
-  const { capituloId, titulo } = useLocalSearchParams();
+  const { capituloId, titulo, numero, manga } = useLocalSearchParams();
   const [paginas, setPaginas] = useState([]);
   const [alturas, setAlturas] = useState({});
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  const dl = useDownload();
+
+  function baixar() {
+    dl.rodar(
+      (onItem, onProgress) =>
+        baixarCapitulos(
+          [{ id: capituloId, numero }],
+          onItem,
+          onProgress,
+          manga
+        ),
+      "Capítulo"
+    );
+  }
+
+  const opcoes = {
+    title: titulo || "Leitura",
+    headerRight: () => (
+      <Pressable onPress={baixar} hitSlop={12}>
+        <Text style={styles.baixar}>⬇️</Text>
+      </Pressable>
+    ),
+  };
 
   useEffect(() => {
     let ativo = true;
@@ -56,7 +84,7 @@ export default function LeitorScreen() {
   if (carregando) {
     return (
       <View style={styles.centro}>
-        <Stack.Screen options={{ title: titulo || "Leitura" }} />
+        <Stack.Screen options={opcoes} />
         <ActivityIndicator color={cores.primaria} size="large" />
         <Text style={styles.aviso}>Carregando páginas...</Text>
       </View>
@@ -66,7 +94,7 @@ export default function LeitorScreen() {
   if (erro) {
     return (
       <View style={styles.centro}>
-        <Stack.Screen options={{ title: titulo || "Leitura" }} />
+        <Stack.Screen options={opcoes} />
         <Text style={styles.erro}>{erro}</Text>
       </View>
     );
@@ -74,7 +102,7 @@ export default function LeitorScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: titulo || "Leitura" }} />
+      <Stack.Screen options={opcoes} />
       <FlatList
         data={paginas}
         keyExtractor={(url, i) => String(i)}
@@ -89,6 +117,12 @@ export default function LeitorScreen() {
           );
         }}
       />
+
+      <ProgressoOverlay
+        visivel={dl.ativo}
+        rotulo={dl.rotulo}
+        fracao={dl.fracao}
+      />
     </View>
   );
 }
@@ -98,4 +132,5 @@ const styles = StyleSheet.create({
   centro: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   aviso: { color: cores.textoFraco },
   erro: { color: cores.erro, textAlign: "center", paddingHorizontal: 24 },
+  baixar: { fontSize: 18 },
 });
