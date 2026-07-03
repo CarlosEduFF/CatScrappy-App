@@ -1,14 +1,17 @@
 // app/capitulos.js — capítulos de um mangá: ler, baixar todos ou intervalo.
 // Tem seletor de idioma (o MangaDex hospeda traduções por língua; títulos
-// licenciados podem ter poucos capítulos legíveis em cada uma).
+// licenciados podem ter poucos capítulos legíveis em cada uma) e, em listas
+// longas, navegação por páginas de 50 + busca por número/título.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
@@ -33,12 +36,19 @@ export default function CapitulosScreen() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [idioma, setIdioma] = useState("pt-br");
+  const [filtro, setFiltro] = useState("");
+  const [pagina, setPagina] = useState(0);
   const dl = useDownload();
+
+  const TAM_PAGINA = 50;
+  const totalPaginas = Math.ceil(capitulos.length / TAM_PAGINA);
 
   useEffect(() => {
     let ativo = true;
     setCarregando(true);
     setErro(null);
+    setPagina(0);
+    setFiltro("");
     (async () => {
       try {
         const caps = await listarCapitulos(mangaId, idioma);
@@ -60,6 +70,19 @@ export default function CapitulosScreen() {
       ativo = false;
     };
   }, [mangaId, idioma]);
+
+  // Com filtro, busca na lista inteira; sem filtro, mostra a página atual.
+  const visiveis = useMemo(() => {
+    const termo = filtro.trim().toLowerCase();
+    if (termo) {
+      return capitulos.filter(
+        (c) =>
+          String(c.numero).includes(termo) ||
+          (c.titulo || "").toLowerCase().includes(termo)
+      );
+    }
+    return capitulos.slice(pagina * TAM_PAGINA, (pagina + 1) * TAM_PAGINA);
+  }, [capitulos, filtro, pagina]);
 
   function rotuloCap(c) {
     const base = `Capítulo ${c.numero}`;
@@ -141,8 +164,53 @@ export default function CapitulosScreen() {
         </View>
       )}
 
+      {!carregando && !erro && capitulos.length > TAM_PAGINA && (
+        <>
+          <TextInput
+            style={styles.busca}
+            placeholder="Buscar capítulo (nº ou título)..."
+            placeholderTextColor={cores.textoFraco}
+            value={filtro}
+            onChangeText={setFiltro}
+            autoCorrect={false}
+          />
+          {!filtro.trim() && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.paginas}
+              contentContainerStyle={styles.paginasConteudo}
+            >
+              {Array.from({ length: totalPaginas }, (_, i) => (
+                <Pressable
+                  key={i}
+                  onPress={() => setPagina(i)}
+                  style={[styles.pagChip, pagina === i && styles.pagChipAtivo]}
+                >
+                  <Text
+                    style={[
+                      styles.pagChipTexto,
+                      pagina === i && styles.pagChipTextoAtivo,
+                    ]}
+                  >
+                    {i * TAM_PAGINA + 1}–
+                    {Math.min((i + 1) * TAM_PAGINA, capitulos.length)}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+          {!!filtro.trim() && (
+            <Text style={styles.resultadoBusca}>
+              {visiveis.length} capítulo{visiveis.length === 1 ? "" : "s"}{" "}
+              encontrado{visiveis.length === 1 ? "" : "s"}
+            </Text>
+          )}
+        </>
+      )}
+
       <FlatList
-        data={capitulos}
+        data={visiveis}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <Pressable style={styles.cartao} onPress={() => ler(item)}>
@@ -192,6 +260,33 @@ const styles = StyleSheet.create({
     borderColor: cores.borda,
   },
   acaoTexto: { color: cores.texto, fontWeight: "600", fontSize: 13 },
+  busca: {
+    backgroundColor: cores.cartao,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    color: cores.texto,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    marginBottom: 10,
+  },
+  paginas: { flexGrow: 0, marginBottom: 12 },
+  paginasConteudo: { gap: 8 },
+  pagChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: cores.cartao,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  pagChipAtivo: {
+    backgroundColor: cores.primaria,
+    borderColor: cores.primaria,
+  },
+  pagChipTexto: { color: cores.textoFraco, fontSize: 13, fontWeight: "600" },
+  pagChipTextoAtivo: { color: cores.sobrePrimaria },
+  resultadoBusca: { color: cores.textoFraco, marginBottom: 10, fontSize: 13 },
   cartao: {
     flexDirection: "row",
     alignItems: "center",
