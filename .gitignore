@@ -13,6 +13,7 @@ expo-env.d.ts
 /ios
 *.apk
 *.aab
+modules/*/android/build/
 
 # EAS
 .easignore
