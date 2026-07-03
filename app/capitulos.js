@@ -1,9 +1,10 @@
 // app/capitulos.js — capítulos de um mangá: ler, baixar todos ou intervalo.
+// Tem seletor de idioma (o MangaDex hospeda traduções por língua; títulos
+// licenciados podem ter poucos capítulos legíveis em cada uma).
 
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -18,21 +19,37 @@ import ProgressoOverlay from "../src/ProgressoOverlay";
 import { pedirIntervalo } from "../src/intervalo";
 import { cores } from "../src/theme";
 
+const IDIOMAS = [
+  { id: "pt-br", nome: "PT-BR" },
+  { id: "en", nome: "EN" },
+  { id: "es-la", nome: "ES" },
+  { id: "todos", nome: "Todos" },
+];
+
 export default function CapitulosScreen() {
   const { mangaId, titulo } = useLocalSearchParams();
   const router = useRouter();
   const [capitulos, setCapitulos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  const [idioma, setIdioma] = useState("pt-br");
   const dl = useDownload();
 
   useEffect(() => {
     let ativo = true;
+    setCarregando(true);
+    setErro(null);
     (async () => {
       try {
-        const caps = await listarCapitulos(mangaId);
+        const caps = await listarCapitulos(mangaId, idioma);
         if (ativo) setCapitulos(caps);
-        if (ativo && caps.length === 0) setErro("Sem capítulos em pt-br.");
+        if (ativo && caps.length === 0) {
+          setErro(
+            idioma === "todos"
+              ? "Nenhum capítulo legível no MangaDex."
+              : "Sem capítulos neste idioma — tente outro."
+          );
+        }
       } catch (e) {
         if (ativo) setErro(e.message);
       } finally {
@@ -42,7 +59,7 @@ export default function CapitulosScreen() {
     return () => {
       ativo = false;
     };
-  }, [mangaId]);
+  }, [mangaId, idioma]);
 
   function rotuloCap(c) {
     const base = `Capítulo ${c.numero}`;
@@ -85,6 +102,25 @@ export default function CapitulosScreen() {
     <View style={styles.container}>
       <Stack.Screen options={{ title: titulo || "Capítulos" }} />
 
+      <View style={styles.idiomas}>
+        {IDIOMAS.map((l) => (
+          <Pressable
+            key={l.id}
+            onPress={() => setIdioma(l.id)}
+            style={[styles.chip, idioma === l.id && styles.chipAtivo]}
+          >
+            <Text
+              style={[
+                styles.chipTexto,
+                idioma === l.id && styles.chipTextoAtivo,
+              ]}
+            >
+              {l.nome}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       {carregando && (
         <View style={styles.centro}>
           <ActivityIndicator color={cores.primaria} size="large" />
@@ -92,7 +128,7 @@ export default function CapitulosScreen() {
         </View>
       )}
 
-      {erro && <Text style={styles.erro}>{erro}</Text>}
+      {erro && !carregando && <Text style={styles.erro}>{erro}</Text>}
 
       {!carregando && !erro && (
         <View style={styles.acoes}>
@@ -111,7 +147,10 @@ export default function CapitulosScreen() {
         renderItem={({ item }) => (
           <Pressable style={styles.cartao} onPress={() => ler(item)}>
             <Text style={styles.cartaoTitulo}>{rotuloCap(item)}</Text>
-            <Text style={styles.paginas}>{item.paginas} pág.</Text>
+            {idioma === "todos" && !!item.idioma && (
+              <Text style={styles.lingua}>{item.idioma}</Text>
+            )}
+            <Text style={styles.paginasCap}>{item.paginas} pág.</Text>
           </Pressable>
         )}
       />
@@ -130,6 +169,18 @@ const styles = StyleSheet.create({
   centro: { alignItems: "center", padding: 24, gap: 12 },
   aviso: { color: cores.textoFraco },
   erro: { color: cores.erro, textAlign: "center", marginVertical: 12 },
+  idiomas: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  chip: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: cores.cartao,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  chipAtivo: { backgroundColor: cores.primaria, borderColor: cores.primaria },
+  chipTexto: { color: cores.textoFraco, fontWeight: "600" },
+  chipTextoAtivo: { color: cores.sobrePrimaria },
   acoes: { flexDirection: "row", gap: 10, marginBottom: 14 },
   acao: {
     flex: 1,
@@ -153,5 +204,12 @@ const styles = StyleSheet.create({
     borderColor: cores.borda,
   },
   cartaoTitulo: { color: cores.texto, fontSize: 15, flex: 1 },
-  paginas: { color: cores.textoFraco, fontSize: 13, marginLeft: 12 },
+  lingua: {
+    color: cores.primaria,
+    fontSize: 11,
+    fontWeight: "700",
+    marginLeft: 8,
+    textTransform: "uppercase",
+  },
+  paginasCap: { color: cores.textoFraco, fontSize: 13, marginLeft: 12 },
 });

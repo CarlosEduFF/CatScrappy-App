@@ -57,8 +57,9 @@ export function buscarManga(nome) {
   return getJSON("/manga/buscar", { nome }).then((d) => d.resultados);
 }
 
-export function listarCapitulos(mangaId) {
-  return getJSON("/manga/capitulos", { manga_id: mangaId }).then(
+export function listarCapitulos(mangaId, idioma = "pt-br") {
+  // idioma: pt-br | en | es-la | ... | "todos" (melhor tradução por capítulo)
+  return getJSON("/manga/capitulos", { manga_id: mangaId, idioma }).then(
     (d) => d.capitulos
   );
 }
