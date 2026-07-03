@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "CatScrappy",
+    "slug": "catscrappy",
+    "version": "1.0.0",
+    "orientation": "default",
+    "scheme": "catscrappy",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#111318"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "android": {
+      "package": "com.carloseduff.catscrappy"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-video",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "apiBaseUrl": "https://catscrappy.onrender.com",
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}

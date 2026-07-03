@@ -1,0 +1,39 @@
+# Dependências
+node_modules/
+
+# Expo
+.expo/
+.expo-shared/
+dist/
+web-build/
+expo-env.d.ts
+
+# Builds nativos (gerados por prebuild / EAS)
+/android
+/ios
+*.apk
+*.aab
+
+# EAS
+.easignore
+
+# Metro
+.metro-health-check*
+
+# Logs e caches
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Ambiente / segredos
+.env
+.env.local
+.env*.local
+
+# macOS / editores
+.DS_Store
+*.pem
+
+# Diagnóstico
+.vscode/
