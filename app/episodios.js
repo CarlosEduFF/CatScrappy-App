@@ -1,14 +1,17 @@
 // app/episodios.js — episódios de um anime: capa/sinopse, assistir e baixar
-// (único no player; temporada/intervalo aqui).
+// (único no player; temporada/intervalo aqui). Em listas longas (One Piece
+// tem 1000+), a navegação é por páginas de 50 + busca por número/título.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
@@ -26,7 +29,25 @@ export default function EpisodiosScreen() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [sinopseAberta, setSinopseAberta] = useState(false);
+  const [filtro, setFiltro] = useState("");
+  const [pagina, setPagina] = useState(0);
   const dl = useDownload();
+
+  const TAM_PAGINA = 50;
+  const totalPaginas = Math.ceil(episodios.length / TAM_PAGINA);
+
+  // Com filtro, busca na lista inteira; sem filtro, mostra a página atual.
+  const visiveis = useMemo(() => {
+    const termo = filtro.trim().toLowerCase();
+    if (termo) {
+      return episodios.filter(
+        (ep) =>
+          ep.titulo.toLowerCase().includes(termo) ||
+          String(ep.numero).includes(termo)
+      );
+    }
+    return episodios.slice(pagina * TAM_PAGINA, (pagina + 1) * TAM_PAGINA);
+  }, [episodios, filtro, pagina]);
 
   useEffect(() => {
     let ativo = true;
@@ -117,8 +138,53 @@ export default function EpisodiosScreen() {
         </View>
       )}
 
+      {!carregando && !erro && episodios.length > TAM_PAGINA && (
+        <>
+          <TextInput
+            style={styles.busca}
+            placeholder="Buscar episódio (nº ou título)..."
+            placeholderTextColor={cores.textoFraco}
+            value={filtro}
+            onChangeText={setFiltro}
+            autoCorrect={false}
+          />
+          {!filtro.trim() && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.paginas}
+              contentContainerStyle={styles.paginasConteudo}
+            >
+              {Array.from({ length: totalPaginas }, (_, i) => (
+                <Pressable
+                  key={i}
+                  onPress={() => setPagina(i)}
+                  style={[styles.pagChip, pagina === i && styles.pagChipAtivo]}
+                >
+                  <Text
+                    style={[
+                      styles.pagChipTexto,
+                      pagina === i && styles.pagChipTextoAtivo,
+                    ]}
+                  >
+                    {i * TAM_PAGINA + 1}–
+                    {Math.min((i + 1) * TAM_PAGINA, episodios.length)}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+          {!!filtro.trim() && (
+            <Text style={styles.resultadoBusca}>
+              {visiveis.length} episódio{visiveis.length === 1 ? "" : "s"}{" "}
+              encontrado{visiveis.length === 1 ? "" : "s"}
+            </Text>
+          )}
+        </>
+      )}
+
       <FlatList
-        data={episodios}
+        data={visiveis}
         keyExtractor={(item, i) => item.url_pagina + i}
         renderItem={({ item }) => (
           <Pressable style={styles.cartao} onPress={() => assistir(item)}>
@@ -161,6 +227,33 @@ const styles = StyleSheet.create({
   fichaTextos: { flex: 1 },
   contagem: { color: cores.primaria, fontWeight: "700", marginBottom: 6 },
   sinopse: { color: cores.textoFraco, fontSize: 13, lineHeight: 18 },
+  busca: {
+    backgroundColor: cores.cartao,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    color: cores.texto,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    marginBottom: 10,
+  },
+  paginas: { flexGrow: 0, marginBottom: 12 },
+  paginasConteudo: { gap: 8 },
+  pagChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: cores.cartao,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  pagChipAtivo: {
+    backgroundColor: cores.primaria,
+    borderColor: cores.primaria,
+  },
+  pagChipTexto: { color: cores.textoFraco, fontSize: 13, fontWeight: "600" },
+  pagChipTextoAtivo: { color: cores.sobrePrimaria },
+  resultadoBusca: { color: cores.textoFraco, marginBottom: 10, fontSize: 13 },
   acoes: { flexDirection: "row", gap: 10, marginBottom: 14 },
   acao: {
     flex: 1,
