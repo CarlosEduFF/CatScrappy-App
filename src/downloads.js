@@ -6,14 +6,21 @@
 // ganha uma subpasta com o próprio nome. Requer build nativo (APK): o
 // expo-file-system não roda no Expo Go.
 //
-// O download vai para o cache (API legada, a única com progresso) e depois
-// é copiado para a pasta SAF pelo módulo nativo local modules/saf-copy.
-// O módulo existe porque o expo-file-system 19 não tem nenhum método com
-// memória constante que escreva num destino content://: read/writeAsString
-// em base64 estouram o heap em vídeos grandes (OutOfMemoryError), e
-// copyAsync/File.copy/FileHandle rejeitam content URIs.
+// Anime: o episódio vai para o cache (API legada, a única com progresso) e
+// depois é copiado para a pasta SAF pelo módulo nativo local
+// modules/saf-copy. O módulo existe porque o expo-file-system 19 não tem
+// nenhum método com memória constante que escreva num destino content://:
+// read/writeAsString em base64 estouram o heap em vídeos grandes
+// (OutOfMemoryError), e copyAsync/File.copy/FileHandle rejeitam content URIs.
+//
+// Mangá: as páginas são baixadas para o cache e viram um único PDF por
+// capítulo (expo-print), copiado para a subpasta do mangá. As imagens são
+// embutidas como base64 no HTML porque o WebView do expo-print não carrega
+// file:// (loadDataWithBaseURL sem allowFileAccess); capítulos são pequenos
+// o bastante para isso não estourar a memória.
 
 import * as FileSystem from "expo-file-system/legacy";
+import * as Print from "expo-print";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { copyToSaf } from "../modules/saf-copy";
 import { extrairVideo, obterPaginas } from "./api";
@@ -132,7 +139,7 @@ export async function baixarEpisodios(site, episodios, onItem, onProgress, titul
 }
 
 // -------------------------------------------------------------------
-// Mangá: um capítulo (todas as páginas como imagens).
+// Mangá: um capítulo vira um único PDF com todas as páginas.
 // -------------------------------------------------------------------
 export async function baixarCapitulo(cap, onProgress, pastaUri) {
   const pasta = pastaUri || (await garantirPasta());
@@ -142,16 +149,59 @@ export async function baixarCapitulo(cap, onProgress, pastaUri) {
     throw new Error("Capítulo sem páginas.");
   }
 
-  for (let i = 0; i < paginas.length; i++) {
-    const url = paginas[i];
-    const ext = (url.split("?")[0].split(".").pop() || "jpg").toLowerCase();
-    const mime = ext === "png" ? "image/png" : "image/jpeg";
-    const nome = `${nomeSeguro("Cap " + cap.numero)}_${String(i + 1).padStart(
-      3,
-      "0"
-    )}.${ext}`;
-    await baixarPara(pasta, url, nome, mime, null);
-    onProgress?.((i + 1) / paginas.length);
+  const temps = [];
+  let pdfUri = null;
+  try {
+    // 1) Baixa as páginas para o cache (0 → 0.7 do progresso).
+    for (let i = 0; i < paginas.length; i++) {
+      const url = paginas[i];
+      const ext = (url.split("?")[0].split(".").pop() || "jpg").toLowerCase();
+      const mime = ext === "png" ? "image/png" : "image/jpeg";
+      const temp = `${FileSystem.cacheDirectory}cap_${cap.id}_${i}.${ext}`;
+      await FileSystem.downloadAsync(url, temp);
+      temps.push({ uri: temp, mime });
+      onProgress?.(((i + 1) / paginas.length) * 0.7);
+    }
+
+    // 2) Monta o HTML (imagens em base64) e gera o PDF (0.7 → 0.95).
+    let corpo = "";
+    for (const pagina of temps) {
+      const b64 = await FileSystem.readAsStringAsync(pagina.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      corpo += `<img src="data:${pagina.mime};base64,${b64}" />`;
+    }
+    const html =
+      "<html><head><meta charset=\"utf-8\"><style>" +
+      "body{margin:0;padding:0}" +
+      "img{width:100%;display:block;page-break-after:always}" +
+      "</style></head><body>" +
+      corpo +
+      "</body></html>";
+    onProgress?.(0.8);
+
+    const resultado = await Print.printToFileAsync({ html });
+    pdfUri = resultado.uri;
+    onProgress?.(0.95);
+
+    // 3) Copia o PDF para a pasta SAF em streaming nativo.
+    const nome = `${nomeSeguro("Cap " + cap.numero)}.pdf`;
+    const destUri = await SAF.createFileAsync(pasta, nome, "application/pdf");
+    try {
+      await copyToSaf(pdfUri, destUri);
+    } catch (e) {
+      await FileSystem.deleteAsync(destUri, { idempotent: true }).catch(() => {});
+      throw e;
+    }
+    onProgress?.(1);
+  } finally {
+    // Limpa páginas e PDF temporários mesmo em caso de erro.
+    for (const pagina of temps) {
+      await FileSystem.deleteAsync(pagina.uri, { idempotent: true }).catch(() => {});
+    }
+    if (pdfUri) {
+      await FileSystem.deleteAsync(pdfUri, { idempotent: true }).catch(() => {});
+    }
   }
 }
 
