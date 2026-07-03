@@ -51,21 +51,26 @@ export function extrairVideo(site, url) {
 }
 
 // ------------------------------------------------------------------
-// Mangá (MangaDex)
+// Mangá — MangaDex e Mugiwaras (One Piece e outros, pt-br)
 // ------------------------------------------------------------------
-export function buscarManga(nome) {
-  return getJSON("/manga/buscar", { nome }).then((d) => d.resultados);
+export const SITES_MANGA = [
+  { id: "mangadex", nome: "MangaDex" },
+  { id: "mugiwaras", nome: "Mugiwaras" },
+];
+
+export function buscarManga(site, nome) {
+  return getJSON("/manga/buscar", { site, nome }).then((d) => d.resultados);
 }
 
-export function listarCapitulos(mangaId, idioma = "pt-br") {
-  // idioma: pt-br | en | es-la | ... | "todos" (melhor tradução por capítulo)
-  return getJSON("/manga/capitulos", { manga_id: mangaId, idioma }).then(
+export function listarCapitulos(site, mangaId, idioma = "pt-br") {
+  // idioma (só MangaDex): pt-br | en | es-la | ... | "todos"
+  return getJSON("/manga/capitulos", { site, manga_id: mangaId, idioma }).then(
     (d) => d.capitulos
   );
 }
 
-export function obterPaginas(capituloId) {
-  return getJSON("/manga/paginas", { capitulo_id: capituloId }).then(
+export function obterPaginas(site, capituloId) {
+  return getJSON("/manga/paginas", { site, capitulo_id: capituloId }).then(
     (d) => d.paginas
   );
 }

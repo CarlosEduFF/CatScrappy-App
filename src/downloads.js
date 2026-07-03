@@ -197,10 +197,12 @@ export async function baixarEpisodios(site, episodios, onItem, onProgress, titul
 // -------------------------------------------------------------------
 // Mangá: um capítulo vira um único PDF com todas as páginas.
 // -------------------------------------------------------------------
-export async function baixarCapitulo(cap, onProgress, pastaUri, token) {
+const MIME_IMG = { png: "image/png", webp: "image/webp" };
+
+export async function baixarCapitulo(siteManga, cap, onProgress, pastaUri, token) {
   const pasta = pastaUri || (await garantirPasta());
 
-  const paginas = await obterPaginas(cap.id);
+  const paginas = await obterPaginas(siteManga, cap.id);
   if (!paginas.length) {
     throw new Error("Capítulo sem páginas.");
   }
@@ -213,7 +215,7 @@ export async function baixarCapitulo(cap, onProgress, pastaUri, token) {
       if (token?.cancelado) throw new Error(CANCELADO);
       const url = paginas[i];
       const ext = (url.split("?")[0].split(".").pop() || "jpg").toLowerCase();
-      const mime = ext === "png" ? "image/png" : "image/jpeg";
+      const mime = MIME_IMG[ext] || "image/jpeg";
       const temp = `${FileSystem.cacheDirectory}cap_${cap.id}_${i}.${ext}`;
       await FileSystem.downloadAsync(url, temp);
       temps.push({ uri: temp, mime });
@@ -265,7 +267,7 @@ export async function baixarCapitulo(cap, onProgress, pastaUri, token) {
 // -------------------------------------------------------------------
 // Mangá: vários capítulos, em sequência, numa subpasta com o nome do mangá.
 // -------------------------------------------------------------------
-export async function baixarCapitulos(capitulos, onItem, onProgress, tituloManga, token) {
+export async function baixarCapitulos(siteManga, capitulos, onItem, onProgress, tituloManga, token) {
   const raiz = await garantirPasta();
   const pasta = tituloManga ? await garantirSubpasta(raiz, tituloManga) : raiz;
   let sucesso = 0;
@@ -276,7 +278,7 @@ export async function baixarCapitulos(capitulos, onItem, onProgress, tituloManga
     const cap = capitulos[i];
     onItem?.(i + 1, capitulos.length, cap);
     try {
-      await baixarCapitulo(cap, onProgress, pasta, token);
+      await baixarCapitulo(siteManga, cap, onProgress, pasta, token);
       sucesso++;
     } catch (e) {
       if (token?.cancelado) break;

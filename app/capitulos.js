@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,8 +31,9 @@ const IDIOMAS = [
 ];
 
 export default function CapitulosScreen() {
-  const { mangaId, titulo } = useLocalSearchParams();
+  const { site, mangaId, titulo } = useLocalSearchParams();
   const router = useRouter();
+  const siteManga = site || "mangadex";
   const [capitulos, setCapitulos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
@@ -51,7 +53,7 @@ export default function CapitulosScreen() {
     setFiltro("");
     (async () => {
       try {
-        const caps = await listarCapitulos(mangaId, idioma);
+        const caps = await listarCapitulos(siteManga, mangaId, idioma);
         if (ativo) setCapitulos(caps);
         if (ativo && caps.length === 0) {
           setErro(
@@ -69,7 +71,7 @@ export default function CapitulosScreen() {
     return () => {
       ativo = false;
     };
-  }, [mangaId, idioma]);
+  }, [siteManga, mangaId, idioma]);
 
   // Com filtro, busca na lista inteira; sem filtro, mostra a página atual.
   const visiveis = useMemo(() => {
@@ -92,7 +94,7 @@ export default function CapitulosScreen() {
   function baixarTodos() {
     dl.rodar(
       (onItem, onProgress, token) =>
-        baixarCapitulos(capitulos, onItem, onProgress, titulo, token),
+        baixarCapitulos(siteManga, capitulos, onItem, onProgress, titulo, token),
       "Capítulo"
     );
   }
@@ -102,7 +104,7 @@ export default function CapitulosScreen() {
     if (selecionados && selecionados.length) {
       dl.rodar(
         (onItem, onProgress, token) =>
-          baixarCapitulos(selecionados, onItem, onProgress, titulo, token),
+          baixarCapitulos(siteManga, selecionados, onItem, onProgress, titulo, token),
         "Capítulo"
       );
     }
@@ -113,6 +115,7 @@ export default function CapitulosScreen() {
       pathname: "/leitor",
       // "numero" nomeia o PDF e "manga" a subpasta, se baixar pelo leitor.
       params: {
+        site: siteManga,
         capituloId: cap.id,
         titulo: rotuloCap(cap),
         numero: cap.numero,
@@ -125,24 +128,26 @@ export default function CapitulosScreen() {
     <View style={styles.container}>
       <Stack.Screen options={{ title: titulo || "Capítulos" }} />
 
-      <View style={styles.idiomas}>
-        {IDIOMAS.map((l) => (
-          <Pressable
-            key={l.id}
-            onPress={() => setIdioma(l.id)}
-            style={[styles.chip, idioma === l.id && styles.chipAtivo]}
-          >
-            <Text
-              style={[
-                styles.chipTexto,
-                idioma === l.id && styles.chipTextoAtivo,
-              ]}
+      {siteManga === "mangadex" && (
+        <View style={styles.idiomas}>
+          {IDIOMAS.map((l) => (
+            <Pressable
+              key={l.id}
+              onPress={() => setIdioma(l.id)}
+              style={[styles.chip, idioma === l.id && styles.chipAtivo]}
             >
-              {l.nome}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+              <Text
+                style={[
+                  styles.chipTexto,
+                  idioma === l.id && styles.chipTextoAtivo,
+                ]}
+              >
+                {l.nome}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       {carregando && (
         <View style={styles.centro}>
@@ -218,7 +223,9 @@ export default function CapitulosScreen() {
             {idioma === "todos" && !!item.idioma && (
               <Text style={styles.lingua}>{item.idioma}</Text>
             )}
-            <Text style={styles.paginasCap}>{item.paginas} pág.</Text>
+            {!!item.paginas && (
+              <Text style={styles.paginasCap}>{item.paginas} pág.</Text>
+            )}
           </Pressable>
         )}
       />
@@ -251,6 +258,25 @@ const styles = StyleSheet.create({
   chipAtivo: { backgroundColor: cores.primaria, borderColor: cores.primaria },
   chipTexto: { color: cores.textoFraco, fontWeight: "600" },
   chipTextoAtivo: { color: cores.sobrePrimaria },
+  ficha: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 14,
+    backgroundColor: cores.cartao,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  capa: {
+    width: 84,
+    height: 118,
+    borderRadius: 8,
+    backgroundColor: cores.cartaoAtivo,
+  },
+  fichaTextos: { flex: 1 },
+  contagem: { color: cores.primaria, fontWeight: "700", marginBottom: 6 },
+  sinopse: { color: cores.textoFraco, fontSize: 13, lineHeight: 18 },
   acoes: { flexDirection: "row", gap: 10, marginBottom: 14 },
   acao: {
     flex: 1,

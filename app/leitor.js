@@ -22,7 +22,8 @@ import { cores } from "../src/theme";
 const LARGURA = Dimensions.get("window").width;
 
 export default function LeitorScreen() {
-  const { capituloId, titulo, numero, manga } = useLocalSearchParams();
+  const { site, capituloId, titulo, numero, manga } = useLocalSearchParams();
+  const siteManga = site || "mangadex";
   const [paginas, setPaginas] = useState([]);
   const [alturas, setAlturas] = useState({});
   const [carregando, setCarregando] = useState(true);
@@ -33,6 +34,7 @@ export default function LeitorScreen() {
     dl.rodar(
       (onItem, onProgress, token) =>
         baixarCapitulos(
+          siteManga,
           [{ id: capituloId, numero }],
           onItem,
           onProgress,
@@ -56,7 +58,7 @@ export default function LeitorScreen() {
     let ativo = true;
     (async () => {
       try {
-        const urls = await obterPaginas(capituloId);
+        const urls = await obterPaginas(siteManga, capituloId);
         if (ativo) setPaginas(urls);
         if (ativo && urls.length === 0) setErro("Capítulo sem páginas.");
       } catch (e) {
