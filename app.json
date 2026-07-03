@@ -3,6 +3,7 @@
     "name": "CatScrappy",
     "slug": "catscrappy",
     "version": "1.0.0",
+    "icon": "./assets/Cat-Icon.png",
     "orientation": "default",
     "scheme": "catscrappy",
     "userInterfaceStyle": "dark",
