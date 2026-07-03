@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     justifyContent: "center",
   },
-  botaoBuscarTexto: { color: "#fff", fontWeight: "700" },
+  botaoBuscarTexto: { color: cores.sobrePrimaria, fontWeight: "700" },
   centro: { alignItems: "center", padding: 24, gap: 12 },
   aviso: { color: cores.textoFraco, textAlign: "center" },
   erro: { color: cores.erro, textAlign: "center", marginVertical: 12 },

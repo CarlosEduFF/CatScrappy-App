@@ -1,13 +1,16 @@
-// src/theme.js — paleta escura compartilhada.
+// src/theme.js — paleta escura compartilhada, derivada da logo (garras
+// pretas sobre laranja vibrante): fundo preto quente e laranja como cor
+// primária. Sobre superfícies laranja, o texto é escuro (como na logo).
 
 export const cores = {
-  fundo: "#111318",
-  cartao: "#1b1e26",
-  cartaoAtivo: "#242833",
-  texto: "#f0f2f5",
-  textoFraco: "#9aa0ac",
-  primaria: "#4f7cff",
-  primariaEscura: "#3a5fd0",
-  borda: "#2a2e38",
+  fundo: "#0e0d0b",
+  cartao: "#1b1917",
+  cartaoAtivo: "#282017",
+  texto: "#f7f3ee",
+  textoFraco: "#a89e91",
+  primaria: "#f5820d",
+  primariaEscura: "#c4670a",
+  sobrePrimaria: "#140d06",
+  borda: "#332b22",
   erro: "#ff5d5d",
 };

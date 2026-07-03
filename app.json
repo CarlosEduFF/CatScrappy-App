@@ -8,8 +8,9 @@
     "scheme": "catscrappy",
     "userInterfaceStyle": "dark",
     "splash": {
+      "image": "./assets/Cat-Icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#111318"
+      "backgroundColor": "#0e0d0b"
     },
     "assetBundlePatterns": ["**/*"],
     "android": {

@@ -73,7 +73,7 @@ function IntervaloModal(props, ref) {
               <Text style={styles.botaoTexto}>Cancelar</Text>
             </Pressable>
             <Pressable style={[styles.botao, styles.ok]} onPress={confirmar}>
-              <Text style={styles.botaoTexto}>Baixar</Text>
+              <Text style={styles.okTexto}>Baixar</Text>
             </Pressable>
           </View>
         </View>
@@ -121,4 +121,5 @@ const styles = StyleSheet.create({
   cancelar: { backgroundColor: cores.cartaoAtivo },
   ok: { backgroundColor: cores.primaria },
   botaoTexto: { color: cores.texto, fontWeight: "700" },
+  okTexto: { color: cores.sobrePrimaria, fontWeight: "700" },
 });
