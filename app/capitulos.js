@@ -31,13 +31,14 @@ const IDIOMAS = [
 ];
 
 export default function CapitulosScreen() {
-  const { site, mangaId, titulo } = useLocalSearchParams();
+  const { site, mangaId, titulo, imagem, sinopse } = useLocalSearchParams();
   const router = useRouter();
   const siteManga = site || "mangadex";
   const [capitulos, setCapitulos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [idioma, setIdioma] = useState("pt-br");
+  const [sinopseAberta, setSinopseAberta] = useState(false);
   const [filtro, setFiltro] = useState("");
   const [pagina, setPagina] = useState(0);
   const dl = useDownload();
@@ -146,6 +147,27 @@ export default function CapitulosScreen() {
               </Text>
             </Pressable>
           ))}
+        </View>
+      )}
+
+      {!carregando && !erro && (!!imagem || !!sinopse) && (
+        <View style={styles.ficha}>
+          {!!imagem && <Image source={{ uri: imagem }} style={styles.capa} />}
+          <View style={styles.fichaTextos}>
+            <Text style={styles.contagem}>
+              {capitulos.length} capítulo{capitulos.length === 1 ? "" : "s"}
+            </Text>
+            {!!sinopse && (
+              <Pressable onPress={() => setSinopseAberta((v) => !v)}>
+                <Text
+                  style={styles.sinopse}
+                  numberOfLines={sinopseAberta ? undefined : 3}
+                >
+                  {sinopse}
+                </Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       )}
 

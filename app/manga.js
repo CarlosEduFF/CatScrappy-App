@@ -42,7 +42,14 @@ export default function BuscaMangaScreen() {
   function abrir(manga) {
     router.push({
       pathname: "/capitulos",
-      params: { site, mangaId: manga.id, titulo: manga.titulo },
+      // Capa e sinopse já vêm da busca; a tela de capítulos só exibe.
+      params: {
+        site,
+        mangaId: manga.id,
+        titulo: manga.titulo,
+        imagem: manga.imagem || "",
+        sinopse: manga.sinopse || "",
+      },
     });
   }
 
@@ -96,7 +103,17 @@ export default function BuscaMangaScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <Pressable style={styles.cartao} onPress={() => abrir(item)}>
-            <Text style={styles.cartaoTitulo}>{item.titulo}</Text>
+            {!!item.imagem && (
+              <Image source={{ uri: item.imagem }} style={styles.capa} />
+            )}
+            <View style={styles.cartaoTextos}>
+              <Text style={styles.cartaoTitulo}>{item.titulo}</Text>
+              {!!item.sinopse && (
+                <Text style={styles.cartaoSinopse} numberOfLines={2}>
+                  {item.sinopse}
+                </Text>
+              )}
+            </View>
           </Pressable>
         )}
       />
