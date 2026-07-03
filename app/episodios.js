@@ -239,8 +239,10 @@ const styles = StyleSheet.create({
     borderColor: cores.borda,
     marginBottom: 10,
   },
-  paginas: { flexGrow: 0, marginBottom: 12 },
-  paginasConteudo: { gap: 8 },
+  // Altura fixa + flexShrink 0: sem isso a FlatList irmã comprime o
+  // ScrollView horizontal e os chips somem.
+  paginas: { flexGrow: 0, flexShrink: 0, height: 38, marginBottom: 12 },
+  paginasConteudo: { gap: 8, alignItems: "center" },
   pagChip: {
     paddingVertical: 6,
     paddingHorizontal: 12,
