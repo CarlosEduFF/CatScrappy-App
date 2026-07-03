@@ -1,6 +1,10 @@
 // src/api.js — cliente do backend CatScrappy (Render).
+//
+// Exceção: o site Mugiwaras é escrapeado direto no celular (src/mugiwaras),
+// porque o Cloudflare dele devolve 403 para o IP de datacenter do Render.
 
 import Constants from "expo-constants";
+import * as mugiwaras from "./mugiwaras";
 
 const BASE_URL =
   Constants.expoConfig?.extra?.apiBaseUrl || "https://catscrappy.onrender.com";
@@ -59,10 +63,12 @@ export const SITES_MANGA = [
 ];
 
 export function buscarManga(site, nome) {
+  if (site === "mugiwaras") return mugiwaras.buscarManga(nome);
   return getJSON("/manga/buscar", { site, nome }).then((d) => d.resultados);
 }
 
 export function listarCapitulos(site, mangaId, idioma = "pt-br") {
+  if (site === "mugiwaras") return mugiwaras.listarCapitulos(mangaId);
   // idioma (só MangaDex): pt-br | en | es-la | ... | "todos"
   return getJSON("/manga/capitulos", { site, manga_id: mangaId, idioma }).then(
     (d) => d.capitulos
@@ -70,6 +76,7 @@ export function listarCapitulos(site, mangaId, idioma = "pt-br") {
 }
 
 export function obterPaginas(site, capituloId) {
+  if (site === "mugiwaras") return mugiwaras.obterPaginas(capituloId);
   return getJSON("/manga/paginas", { site, capitulo_id: capituloId }).then(
     (d) => d.paginas
   );
