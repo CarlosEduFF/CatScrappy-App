@@ -96,21 +96,28 @@ export async function listarCapitulos(mangaUrl) {
 }
 
 // Páginas de um capítulo: descobre a base no CDN e a última página por HEADs.
+// O nome do arquivo varia com a idade do capítulo: os novos usam
+// page_001.webp e os antigos 001.webp — o prefixo, o zero-padding e a
+// extensão são deduzidos do exemplo encontrado no HTML.
 export async function obterPaginas(capUrl) {
   const html = await texto(capUrl);
 
   const m = html.match(
-    /https:\/\/cdn\.mugiverso\.com\/mugiwarasoficial\/(manga_[a-z0-9]+)\/([a-f0-9]+)\/page_\d+\.webp/
+    /https:\/\/cdn\.mugiverso\.com\/mugiwarasoficial\/(manga_[a-z0-9]+)\/([a-f0-9]+)\/((?:page_)?)(\d+)\.(webp|jpe?g|png)/i
   );
   if (!m) {
-    // Fallback: capítulos antigos podem ter as <img> direto no HTML.
+    // Fallback: capítulos podem ter as <img> direto no HTML.
     return [...html.matchAll(
       /<img[^>]+class="wp-manga-chapter-img[^"]*"[^>]*(?:data-src|src)="\s*([^"]+?)\s*"/g
     )].map((x) => x[1]);
   }
 
   const base = `https://cdn.mugiverso.com/mugiwarasoficial/${m[1]}/${m[2]}`;
-  const pagina = (n) => `${base}/page_${String(n).padStart(3, "0")}.webp`;
+  const prefixo = m[3];
+  const digitos = m[4].length;
+  const ext = m[5];
+  const pagina = (n) =>
+    `${base}/${prefixo}${String(n).padStart(digitos, "0")}.${ext}`;
 
   let lo = 1;
   let hi = 32;
