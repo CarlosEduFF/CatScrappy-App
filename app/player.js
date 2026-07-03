@@ -101,7 +101,7 @@ export default function PlayerScreen() {
           <VideoView
             style={styles.video}
             player={player}
-            allowsFullscreen
+            fullscreenOptions={{ enable: true }}
             allowsPictureInPicture
             nativeControls
           />
