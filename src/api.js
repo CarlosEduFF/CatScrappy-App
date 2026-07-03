@@ -49,3 +49,22 @@ export function extrairVideo(site, url) {
   // url_player já é a URL pronta para tocar (proxy quando for MP4).
   return getJSON("/extrair-video", { site, url });
 }
+
+// ------------------------------------------------------------------
+// Mangá (MangaDex)
+// ------------------------------------------------------------------
+export function buscarManga(nome) {
+  return getJSON("/manga/buscar", { nome }).then((d) => d.resultados);
+}
+
+export function listarCapitulos(mangaId) {
+  return getJSON("/manga/capitulos", { manga_id: mangaId }).then(
+    (d) => d.capitulos
+  );
+}
+
+export function obterPaginas(capituloId) {
+  return getJSON("/manga/paginas", { capitulo_id: capituloId }).then(
+    (d) => d.paginas
+  );
+}
