@@ -17,14 +17,17 @@ class SafCopyModule : Module() {
     Name("SafCopy")
 
     // AsyncFunction roda fora da main thread, então a cópia não trava a UI.
-    AsyncFunction("copyToSaf") { fromFileUri: String, toContentUri: String ->
+    // append=true abre o destino em modo "wa" (write-append), o que permite
+    // montar um arquivo grande em pedaços (ex.: segmentos de um stream HLS).
+    AsyncFunction("copyToSaf") { fromFileUri: String, toContentUri: String, append: Boolean ->
       val context = appContext.reactContext
         ?: throw CodedException("ERR_NO_CONTEXT", "React context indisponível", null)
 
       val fromPath = Uri.parse(fromFileUri).path
         ?: throw CodedException("ERR_BAD_SOURCE", "URI de origem inválida: $fromFileUri", null)
 
-      val output = context.contentResolver.openOutputStream(Uri.parse(toContentUri))
+      val mode = if (append) "wa" else "w"
+      val output = context.contentResolver.openOutputStream(Uri.parse(toContentUri), mode)
         ?: throw CodedException("ERR_BAD_DEST", "Não foi possível abrir o destino: $toContentUri", null)
 
       FileInputStream(File(fromPath)).use { input ->
