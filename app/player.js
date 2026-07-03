@@ -49,13 +49,6 @@ export default function PlayerScreen() {
   });
 
   function baixar() {
-    if (fonte?.is_hls) {
-      Alert.alert(
-        "Não suportado",
-        "Este episódio é um stream HLS — não é possível baixar como MP4."
-      );
-      return;
-    }
     dl.rodar(
       (onItem, onProgress) =>
         baixarEpisodios(

@@ -12,6 +12,8 @@
 // nenhum método com memória constante que escreva num destino content://:
 // read/writeAsString em base64 estouram o heap em vídeos grandes
 // (OutOfMemoryError), e copyAsync/File.copy/FileHandle rejeitam content URIs.
+// Episódios em HLS são baixados segmento a segmento e concatenados no
+// destino via append nativo (ver baixarHls e src/hls.js).
 //
 // Mangá: as páginas são baixadas para o cache e viram um único PDF por
 // capítulo (expo-print), copiado para a subpasta do mangá. As imagens são
@@ -24,6 +26,7 @@ import * as Print from "expo-print";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { copyToSaf } from "../modules/saf-copy";
 import { extrairVideo, obterPaginas } from "./api";
+import { obterSegmentos, resolverUrl } from "./hls";
 
 const SAF = FileSystem.StorageAccessFramework;
 const CHAVE_PASTA = "@catscrappy:pastaDownloads";
@@ -96,23 +99,50 @@ async function baixarPara(pastaUri, url, nomeArquivo, mime, onProgress) {
   }
 }
 
+// Baixa um episódio HLS: concatena os segmentos da playlist num arquivo
+// único, anexando cada um ao destino SAF (streaming nativo, memória
+// constante). MPEG-TS concatenado é um .ts reproduzível; com #EXT-X-MAP
+// (fMP4), init + segmentos formam um .mp4 fragmentado válido.
+async function baixarHls(pastaUri, urlM3u8, nomeBase, onProgress) {
+  const { urlBase, segmentos, init } = await obterSegmentos(urlM3u8);
+
+  const fmp4 = !!init;
+  const nome = nomeBase + (fmp4 ? ".mp4" : ".ts");
+  const mime = fmp4 ? "video/mp4" : "video/mp2t";
+  const lista = fmp4 ? [init, ...segmentos] : segmentos;
+
+  const destUri = await SAF.createFileAsync(pastaUri, nome, mime);
+  const temp = FileSystem.cacheDirectory + "segmento.bin";
+  try {
+    for (let i = 0; i < lista.length; i++) {
+      const segUrl = resolverUrl(urlBase, lista[i]);
+      await FileSystem.downloadAsync(segUrl, temp);
+      await copyToSaf(temp, destUri, i > 0); // anexa a partir do segundo
+      onProgress?.((i + 1) / lista.length);
+    }
+  } catch (e) {
+    // Não deixa um arquivo parcial na pasta do usuário.
+    await FileSystem.deleteAsync(destUri, { idempotent: true }).catch(() => {});
+    throw e;
+  } finally {
+    await FileSystem.deleteAsync(temp, { idempotent: true }).catch(() => {});
+  }
+}
+
 // -------------------------------------------------------------------
-// Anime: um episódio (arquivo de vídeo MP4).
+// Anime: um episódio (MP4 direto ou stream HLS).
 // -------------------------------------------------------------------
 export async function baixarEpisodio(site, ep, onProgress, pastaUri) {
   const pasta = pastaUri || (await garantirPasta());
 
   const { url_player } = await extrairVideo(site, ep.url_pagina);
-  // HLS (.m3u8) é uma playlist de segmentos, não um arquivo único: o
-  // expo-file-system não baixa isso como um MP4. Sinalizamos ao chamador.
-  if (url_player.split("?")[0].endsWith(".m3u8")) {
-    const err = new Error("Episódio em HLS — baixe pelo player (não suportado).");
-    err.code = "HLS_NAO_SUPORTADO";
-    throw err;
-  }
+  const nomeBase = nomeSeguro(ep.titulo || "episodio");
 
-  const nome = nomeSeguro(ep.titulo || "episodio") + ".mp4";
-  await baixarPara(pasta, url_player, nome, "video/mp4", onProgress);
+  if (url_player.split("?")[0].endsWith(".m3u8")) {
+    await baixarHls(pasta, url_player, nomeBase, onProgress);
+    return;
+  }
+  await baixarPara(pasta, url_player, nomeBase + ".mp4", "video/mp4", onProgress);
 }
 
 // -------------------------------------------------------------------
