@@ -51,7 +51,8 @@ export default function CapitulosScreen() {
 
   function baixarTodos() {
     dl.rodar(
-      (onItem, onProgress) => baixarCapitulos(capitulos, onItem, onProgress),
+      (onItem, onProgress) =>
+        baixarCapitulos(capitulos, onItem, onProgress, titulo),
       "Capítulo"
     );
   }
@@ -61,7 +62,7 @@ export default function CapitulosScreen() {
     if (selecionados && selecionados.length) {
       dl.rodar(
         (onItem, onProgress) =>
-          baixarCapitulos(selecionados, onItem, onProgress),
+          baixarCapitulos(selecionados, onItem, onProgress, titulo),
         "Capítulo"
       );
     }

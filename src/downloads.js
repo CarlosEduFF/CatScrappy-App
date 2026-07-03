@@ -2,7 +2,8 @@
 //
 // Usa o Storage Access Framework (SAF) do Android: na primeira vez o usuário
 // escolhe a pasta de destino (ex.: Download), e a permissão fica guardada em
-// AsyncStorage para os próximos downloads. Requer build nativo (APK): o
+// AsyncStorage para os próximos downloads. Dentro dela, cada anime/mangá
+// ganha uma subpasta com o próprio nome. Requer build nativo (APK): o
 // expo-file-system não roda no Expo Go.
 //
 // O download vai para o cache (API legada, a única com progresso) e depois
@@ -49,6 +50,21 @@ export async function escolherPasta() {
   return perm.directoryUri;
 }
 
+// Garante uma subpasta com o nome do título dentro da pasta escolhida.
+// Procura uma existente antes de criar: makeDirectoryAsync com nome repetido
+// criaria "Nome (1)" em vez de reusar.
+async function garantirSubpasta(pastaUri, titulo) {
+  const nome = nomeSeguro(titulo);
+  if (!nome) return pastaUri;
+
+  const filhos = await SAF.readDirectoryAsync(pastaUri).catch(() => []);
+  const existente = filhos.find((uri) =>
+    decodeURIComponent(uri).endsWith("/" + nome)
+  );
+  if (existente) return existente;
+  return SAF.makeDirectoryAsync(pastaUri, nome);
+}
+
 // Baixa uma URL para o cache (com progresso) e copia para a pasta SAF.
 async function baixarPara(pastaUri, url, nomeArquivo, mime, onProgress) {
   const temp = FileSystem.cacheDirectory + nomeArquivo;
@@ -93,11 +109,12 @@ export async function baixarEpisodio(site, ep, onProgress, pastaUri) {
 }
 
 // -------------------------------------------------------------------
-// Anime: vários episódios (temporada/intervalo), em sequência.
-// Retorna { sucesso, falhas: [{titulo, erro}] }.
+// Anime: vários episódios (temporada/intervalo), em sequência, numa
+// subpasta com o nome do anime. Retorna { sucesso, falhas: [{titulo, erro}] }.
 // -------------------------------------------------------------------
-export async function baixarEpisodios(site, episodios, onItem, onProgress) {
-  const pasta = await garantirPasta();
+export async function baixarEpisodios(site, episodios, onItem, onProgress, tituloAnime) {
+  const raiz = await garantirPasta();
+  const pasta = tituloAnime ? await garantirSubpasta(raiz, tituloAnime) : raiz;
   let sucesso = 0;
   const falhas = [];
 
@@ -139,10 +156,11 @@ export async function baixarCapitulo(cap, onProgress, pastaUri) {
 }
 
 // -------------------------------------------------------------------
-// Mangá: vários capítulos, em sequência.
+// Mangá: vários capítulos, em sequência, numa subpasta com o nome do mangá.
 // -------------------------------------------------------------------
-export async function baixarCapitulos(capitulos, onItem, onProgress) {
-  const pasta = await garantirPasta();
+export async function baixarCapitulos(capitulos, onItem, onProgress, tituloManga) {
+  const raiz = await garantirPasta();
+  const pasta = tituloManga ? await garantirSubpasta(raiz, tituloManga) : raiz;
   let sucesso = 0;
   const falhas = [];
 

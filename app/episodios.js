@@ -51,7 +51,8 @@ export default function EpisodiosScreen() {
 
   function baixarUm(ep) {
     dl.rodar(
-      (onItem, onProgress) => baixarEpisodios(site, [ep], onItem, onProgress),
+      (onItem, onProgress) =>
+        baixarEpisodios(site, [ep], onItem, onProgress, titulo),
       "Episódio"
     );
   }
@@ -59,7 +60,7 @@ export default function EpisodiosScreen() {
   function baixarTemporada() {
     dl.rodar(
       (onItem, onProgress) =>
-        baixarEpisodios(site, episodios, onItem, onProgress),
+        baixarEpisodios(site, episodios, onItem, onProgress, titulo),
       "Episódio"
     );
   }
@@ -69,7 +70,7 @@ export default function EpisodiosScreen() {
     if (selecionados && selecionados.length) {
       dl.rodar(
         (onItem, onProgress) =>
-          baixarEpisodios(site, selecionados, onItem, onProgress),
+          baixarEpisodios(site, selecionados, onItem, onProgress, titulo),
         "Episódio"
       );
     }
