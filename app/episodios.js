@@ -45,16 +45,9 @@ export default function EpisodiosScreen() {
   function assistir(ep) {
     router.push({
       pathname: "/player",
-      params: { site, url: ep.url_pagina, titulo: ep.titulo },
+      // "anime" vai junto para o player nomear a subpasta de download.
+      params: { site, url: ep.url_pagina, titulo: ep.titulo, anime: titulo },
     });
-  }
-
-  function baixarUm(ep) {
-    dl.rodar(
-      (onItem, onProgress) =>
-        baixarEpisodios(site, [ep], onItem, onProgress, titulo),
-      "Episódio"
-    );
   }
 
   function baixarTemporada() {
@@ -104,17 +97,10 @@ export default function EpisodiosScreen() {
         data={episodios}
         keyExtractor={(item, i) => item.url_pagina + i}
         renderItem={({ item }) => (
-          <View style={styles.cartao}>
-            <Pressable style={styles.assistir} onPress={() => assistir(item)}>
-              <Text style={styles.cartaoTitulo}>{item.titulo}</Text>
-            </Pressable>
-            <Pressable style={styles.iconeBtn} onPress={() => assistir(item)}>
-              <Text style={styles.play}>▶</Text>
-            </Pressable>
-            <Pressable style={styles.iconeBtn} onPress={() => baixarUm(item)}>
-              <Text style={styles.baixar}>⬇️</Text>
-            </Pressable>
-          </View>
+          <Pressable style={styles.cartao} onPress={() => assistir(item)}>
+            <Text style={styles.cartaoTitulo}>{item.titulo}</Text>
+            <Text style={styles.play}>▶</Text>
+          </Pressable>
         )}
       />
 
@@ -146,15 +132,14 @@ const styles = StyleSheet.create({
   cartao: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: cores.cartao,
     borderRadius: 12,
+    padding: 16,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: cores.borda,
   },
-  assistir: { flex: 1, padding: 16 },
-  cartaoTitulo: { color: cores.texto, fontSize: 15 },
-  iconeBtn: { paddingHorizontal: 14, paddingVertical: 16 },
-  play: { color: cores.primaria, fontSize: 18 },
-  baixar: { fontSize: 18 },
+  cartaoTitulo: { color: cores.texto, fontSize: 15, flex: 1 },
+  play: { color: cores.primaria, fontSize: 18, marginLeft: 12 },
 });

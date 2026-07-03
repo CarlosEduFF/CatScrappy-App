@@ -1,4 +1,5 @@
-// app/player.js — extrai o link e toca no player interno; permite abrir no VLC.
+// app/player.js — extrai o link e toca no player interno; permite abrir no
+// VLC e baixar o episódio para a pasta do anime.
 
 import { useEffect, useState } from "react";
 import {
@@ -13,13 +14,17 @@ import {
 import { useLocalSearchParams, Stack } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { extrairVideo } from "../src/api";
+import { baixarEpisodios } from "../src/downloads";
+import { useDownload } from "../src/useDownload";
+import ProgressoOverlay from "../src/ProgressoOverlay";
 import { cores } from "../src/theme";
 
 export default function PlayerScreen() {
-  const { site, url, titulo } = useLocalSearchParams();
+  const { site, url, titulo, anime } = useLocalSearchParams();
   const [fonte, setFonte] = useState(null); // { url_player, url_video, is_hls }
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  const dl = useDownload();
 
   useEffect(() => {
     let ativo = true;
@@ -42,6 +47,27 @@ export default function PlayerScreen() {
   const player = useVideoPlayer(fonte?.url_player ?? null, (p) => {
     p.play();
   });
+
+  function baixar() {
+    if (fonte?.is_hls) {
+      Alert.alert(
+        "Não suportado",
+        "Este episódio é um stream HLS — não é possível baixar como MP4."
+      );
+      return;
+    }
+    dl.rodar(
+      (onItem, onProgress) =>
+        baixarEpisodios(
+          site,
+          [{ url_pagina: url, titulo }],
+          onItem,
+          onProgress,
+          anime
+        ),
+      "Episódio"
+    );
+  }
 
   async function abrirNoVLC() {
     // O VLC do Android abre URLs de vídeo por intent padrão. Tentamos o
@@ -92,11 +118,22 @@ export default function PlayerScreen() {
             </Text>
           </View>
 
-          <Pressable style={styles.botaoVLC} onPress={abrirNoVLC}>
-            <Text style={styles.botaoVLCTexto}>🎬 Abrir no VLC</Text>
-          </Pressable>
+          <View style={styles.acoes}>
+            <Pressable style={styles.botao} onPress={baixar}>
+              <Text style={styles.botaoTexto}>⬇️ Baixar</Text>
+            </Pressable>
+            <Pressable style={styles.botao} onPress={abrirNoVLC}>
+              <Text style={styles.botaoTexto}>🎬 Abrir no VLC</Text>
+            </Pressable>
+          </View>
         </>
       )}
+
+      <ProgressoOverlay
+        visivel={dl.ativo}
+        rotulo={dl.rotulo}
+        fracao={dl.fracao}
+      />
     </View>
   );
 }
@@ -109,8 +146,9 @@ const styles = StyleSheet.create({
   video: { width: "100%", aspectRatio: 16 / 9, backgroundColor: "#000" },
   info: { padding: 16 },
   tipo: { color: cores.textoFraco, fontSize: 13 },
-  botaoVLC: {
-    marginHorizontal: 16,
+  acoes: { flexDirection: "row", gap: 10, marginHorizontal: 16 },
+  botao: {
+    flex: 1,
     backgroundColor: cores.cartaoAtivo,
     borderRadius: 12,
     padding: 16,
@@ -118,5 +156,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: cores.borda,
   },
-  botaoVLCTexto: { color: cores.texto, fontWeight: "700", fontSize: 15 },
+  botaoTexto: { color: cores.texto, fontWeight: "700", fontSize: 15 },
 });
