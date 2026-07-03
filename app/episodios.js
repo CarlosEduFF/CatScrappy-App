@@ -76,8 +76,8 @@ export default function EpisodiosScreen() {
 
   function baixarTemporada() {
     dl.rodar(
-      (onItem, onProgress) =>
-        baixarEpisodios(site, episodios, onItem, onProgress, titulo),
+      (onItem, onProgress, token) =>
+        baixarEpisodios(site, episodios, onItem, onProgress, titulo, token),
       "Episódio"
     );
   }
@@ -86,8 +86,8 @@ export default function EpisodiosScreen() {
     const selecionados = await pedirIntervalo(episodios, "episódio");
     if (selecionados && selecionados.length) {
       dl.rodar(
-        (onItem, onProgress) =>
-          baixarEpisodios(site, selecionados, onItem, onProgress, titulo),
+        (onItem, onProgress, token) =>
+          baixarEpisodios(site, selecionados, onItem, onProgress, titulo, token),
         "Episódio"
       );
     }
@@ -198,6 +198,8 @@ export default function EpisodiosScreen() {
         visivel={dl.ativo}
         rotulo={dl.rotulo}
         fracao={dl.fracao}
+        onOcultar={dl.ocultar}
+        onCancelar={dl.cancelar}
       />
     </View>
   );

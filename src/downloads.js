@@ -75,8 +75,12 @@ async function garantirSubpasta(pastaUri, titulo) {
   return SAF.makeDirectoryAsync(pastaUri, nome);
 }
 
+const CANCELADO = "Download cancelado.";
+
 // Baixa uma URL para o cache (com progresso) e copia para a pasta SAF.
-async function baixarPara(pastaUri, url, nomeArquivo, mime, onProgress) {
+// O token (opcional) permite abortar o arquivo em andamento via cancelAsync.
+async function baixarPara(pastaUri, url, nomeArquivo, mime, onProgress, token) {
+  if (token?.cancelado) throw new Error(CANCELADO);
   const temp = FileSystem.cacheDirectory + nomeArquivo;
 
   const dl = FileSystem.createDownloadResumable(url, temp, {}, (p) => {
@@ -84,7 +88,19 @@ async function baixarPara(pastaUri, url, nomeArquivo, mime, onProgress) {
       onProgress(p.totalBytesWritten / p.totalBytesExpectedToWrite);
     }
   });
-  const { uri: tempUri } = await dl.downloadAsync();
+  if (token) token.abortar = () => dl.cancelAsync().catch(() => {});
+
+  let resultado;
+  try {
+    resultado = await dl.downloadAsync();
+  } finally {
+    if (token) token.abortar = null;
+  }
+  if (!resultado || token?.cancelado) {
+    await FileSystem.deleteAsync(temp, { idempotent: true }).catch(() => {});
+    throw new Error(CANCELADO);
+  }
+  const { uri: tempUri } = resultado;
 
   // Cria o arquivo de destino na pasta SAF e copia em streaming nativo.
   const destUri = await SAF.createFileAsync(pastaUri, nomeArquivo, mime);
@@ -103,7 +119,7 @@ async function baixarPara(pastaUri, url, nomeArquivo, mime, onProgress) {
 // único, anexando cada um ao destino SAF (streaming nativo, memória
 // constante). MPEG-TS concatenado é um .ts reproduzível; com #EXT-X-MAP
 // (fMP4), init + segmentos formam um .mp4 fragmentado válido.
-async function baixarHls(pastaUri, urlM3u8, nomeBase, onProgress) {
+async function baixarHls(pastaUri, urlM3u8, nomeBase, onProgress, token) {
   const { urlBase, segmentos, init } = await obterSegmentos(urlM3u8);
 
   const fmp4 = !!init;
@@ -115,6 +131,7 @@ async function baixarHls(pastaUri, urlM3u8, nomeBase, onProgress) {
   const temp = FileSystem.cacheDirectory + "segmento.bin";
   try {
     for (let i = 0; i < lista.length; i++) {
+      if (token?.cancelado) throw new Error(CANCELADO);
       const segUrl = resolverUrl(urlBase, lista[i]);
       await FileSystem.downloadAsync(segUrl, temp);
       await copyToSaf(temp, destUri, i > 0); // anexa a partir do segundo
@@ -132,46 +149,55 @@ async function baixarHls(pastaUri, urlM3u8, nomeBase, onProgress) {
 // -------------------------------------------------------------------
 // Anime: um episódio (MP4 direto ou stream HLS).
 // -------------------------------------------------------------------
-export async function baixarEpisodio(site, ep, onProgress, pastaUri) {
+export async function baixarEpisodio(site, ep, onProgress, pastaUri, token) {
   const pasta = pastaUri || (await garantirPasta());
 
   const { url_player } = await extrairVideo(site, ep.url_pagina);
   const nomeBase = nomeSeguro(ep.titulo || "episodio");
 
   if (url_player.split("?")[0].endsWith(".m3u8")) {
-    await baixarHls(pasta, url_player, nomeBase, onProgress);
+    await baixarHls(pasta, url_player, nomeBase, onProgress, token);
     return;
   }
-  await baixarPara(pasta, url_player, nomeBase + ".mp4", "video/mp4", onProgress);
+  await baixarPara(
+    pasta,
+    url_player,
+    nomeBase + ".mp4",
+    "video/mp4",
+    onProgress,
+    token
+  );
 }
 
 // -------------------------------------------------------------------
 // Anime: vários episódios (temporada/intervalo), em sequência, numa
 // subpasta com o nome do anime. Retorna { sucesso, falhas: [{titulo, erro}] }.
 // -------------------------------------------------------------------
-export async function baixarEpisodios(site, episodios, onItem, onProgress, tituloAnime) {
+export async function baixarEpisodios(site, episodios, onItem, onProgress, tituloAnime, token) {
   const raiz = await garantirPasta();
   const pasta = tituloAnime ? await garantirSubpasta(raiz, tituloAnime) : raiz;
   let sucesso = 0;
   const falhas = [];
 
   for (let i = 0; i < episodios.length; i++) {
+    if (token?.cancelado) break;
     const ep = episodios[i];
     onItem?.(i + 1, episodios.length, ep);
     try {
-      await baixarEpisodio(site, ep, onProgress, pasta);
+      await baixarEpisodio(site, ep, onProgress, pasta, token);
       sucesso++;
     } catch (e) {
+      if (token?.cancelado) break;
       falhas.push({ titulo: ep.titulo, erro: e.message });
     }
   }
-  return { sucesso, falhas };
+  return { sucesso, falhas, cancelado: !!token?.cancelado };
 }
 
 // -------------------------------------------------------------------
 // Mangá: um capítulo vira um único PDF com todas as páginas.
 // -------------------------------------------------------------------
-export async function baixarCapitulo(cap, onProgress, pastaUri) {
+export async function baixarCapitulo(cap, onProgress, pastaUri, token) {
   const pasta = pastaUri || (await garantirPasta());
 
   const paginas = await obterPaginas(cap.id);
@@ -184,6 +210,7 @@ export async function baixarCapitulo(cap, onProgress, pastaUri) {
   try {
     // 1) Baixa as páginas para o cache (0 → 0.7 do progresso).
     for (let i = 0; i < paginas.length; i++) {
+      if (token?.cancelado) throw new Error(CANCELADO);
       const url = paginas[i];
       const ext = (url.split("?")[0].split(".").pop() || "jpg").toLowerCase();
       const mime = ext === "png" ? "image/png" : "image/jpeg";
@@ -238,21 +265,23 @@ export async function baixarCapitulo(cap, onProgress, pastaUri) {
 // -------------------------------------------------------------------
 // Mangá: vários capítulos, em sequência, numa subpasta com o nome do mangá.
 // -------------------------------------------------------------------
-export async function baixarCapitulos(capitulos, onItem, onProgress, tituloManga) {
+export async function baixarCapitulos(capitulos, onItem, onProgress, tituloManga, token) {
   const raiz = await garantirPasta();
   const pasta = tituloManga ? await garantirSubpasta(raiz, tituloManga) : raiz;
   let sucesso = 0;
   const falhas = [];
 
   for (let i = 0; i < capitulos.length; i++) {
+    if (token?.cancelado) break;
     const cap = capitulos[i];
     onItem?.(i + 1, capitulos.length, cap);
     try {
-      await baixarCapitulo(cap, onProgress, pasta);
+      await baixarCapitulo(cap, onProgress, pasta, token);
       sucesso++;
     } catch (e) {
+      if (token?.cancelado) break;
       falhas.push({ titulo: `Cap ${cap.numero}`, erro: e.message });
     }
   }
-  return { sucesso, falhas };
+  return { sucesso, falhas, cancelado: !!token?.cancelado };
 }

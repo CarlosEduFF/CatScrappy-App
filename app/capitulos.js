@@ -91,8 +91,8 @@ export default function CapitulosScreen() {
 
   function baixarTodos() {
     dl.rodar(
-      (onItem, onProgress) =>
-        baixarCapitulos(capitulos, onItem, onProgress, titulo),
+      (onItem, onProgress, token) =>
+        baixarCapitulos(capitulos, onItem, onProgress, titulo, token),
       "Capítulo"
     );
   }
@@ -101,8 +101,8 @@ export default function CapitulosScreen() {
     const selecionados = await pedirIntervalo(capitulos, "capítulo");
     if (selecionados && selecionados.length) {
       dl.rodar(
-        (onItem, onProgress) =>
-          baixarCapitulos(selecionados, onItem, onProgress, titulo),
+        (onItem, onProgress, token) =>
+          baixarCapitulos(selecionados, onItem, onProgress, titulo, token),
         "Capítulo"
       );
     }
@@ -227,6 +227,8 @@ export default function CapitulosScreen() {
         visivel={dl.ativo}
         rotulo={dl.rotulo}
         fracao={dl.fracao}
+        onOcultar={dl.ocultar}
+        onCancelar={dl.cancelar}
       />
     </View>
   );

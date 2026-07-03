@@ -31,12 +31,13 @@ export default function LeitorScreen() {
 
   function baixar() {
     dl.rodar(
-      (onItem, onProgress) =>
+      (onItem, onProgress, token) =>
         baixarCapitulos(
           [{ id: capituloId, numero }],
           onItem,
           onProgress,
-          manga
+          manga,
+          token
         ),
       "Capítulo"
     );
@@ -122,6 +123,8 @@ export default function LeitorScreen() {
         visivel={dl.ativo}
         rotulo={dl.rotulo}
         fracao={dl.fracao}
+        onOcultar={dl.ocultar}
+        onCancelar={dl.cancelar}
       />
     </View>
   );

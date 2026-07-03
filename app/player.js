@@ -50,13 +50,14 @@ export default function PlayerScreen() {
 
   function baixar() {
     dl.rodar(
-      (onItem, onProgress) =>
+      (onItem, onProgress, token) =>
         baixarEpisodios(
           site,
           [{ url_pagina: url, titulo }],
           onItem,
           onProgress,
-          anime
+          anime,
+          token
         ),
       "Episódio"
     );
@@ -126,6 +127,8 @@ export default function PlayerScreen() {
         visivel={dl.ativo}
         rotulo={dl.rotulo}
         fracao={dl.fracao}
+        onOcultar={dl.ocultar}
+        onCancelar={dl.cancelar}
       />
     </View>
   );

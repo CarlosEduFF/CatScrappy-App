@@ -1,12 +1,32 @@
 // src/ProgressoOverlay.js — overlay de progresso durante downloads em lote.
+// "Ocultar" fecha o overlay sem parar o download (o progresso continua na
+// barra de notificação); "Cancelar" interrompe o lote.
 
-import { ActivityIndicator, Modal, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { cores } from "./theme";
 
-export default function ProgressoOverlay({ visivel, rotulo, fracao }) {
+export default function ProgressoOverlay({
+  visivel,
+  rotulo,
+  fracao,
+  onOcultar,
+  onCancelar,
+}) {
   const pct = Math.round((fracao || 0) * 100);
   return (
-    <Modal visible={visivel} transparent animationType="fade">
+    <Modal
+      visible={visivel}
+      transparent
+      animationType="fade"
+      onRequestClose={onOcultar}
+    >
       <View style={styles.fundo}>
         <View style={styles.caixa}>
           <ActivityIndicator color={cores.primaria} size="large" />
@@ -15,6 +35,22 @@ export default function ProgressoOverlay({ visivel, rotulo, fracao }) {
             <View style={[styles.barra, { width: `${pct}%` }]} />
           </View>
           <Text style={styles.pct}>{pct}%</Text>
+
+          <View style={styles.botoes}>
+            {!!onOcultar && (
+              <Pressable style={styles.botao} onPress={onOcultar}>
+                <Text style={styles.botaoTexto}>Ocultar</Text>
+              </Pressable>
+            )}
+            {!!onCancelar && (
+              <Pressable
+                style={[styles.botao, styles.cancelar]}
+                onPress={onCancelar}
+              >
+                <Text style={styles.cancelarTexto}>Cancelar</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       </View>
     </Modal>
@@ -48,4 +84,17 @@ const styles = StyleSheet.create({
   },
   barra: { height: "100%", backgroundColor: cores.primaria },
   pct: { color: cores.textoFraco, fontSize: 13 },
+  botoes: { flexDirection: "row", gap: 10, marginTop: 4 },
+  botao: {
+    flex: 1,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: "center",
+    backgroundColor: cores.cartaoAtivo,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  cancelar: { backgroundColor: "transparent", borderColor: cores.erro },
+  botaoTexto: { color: cores.texto, fontWeight: "700" },
+  cancelarTexto: { color: cores.erro, fontWeight: "700" },
 });
