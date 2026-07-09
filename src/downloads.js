@@ -207,6 +207,11 @@ export async function baixarCapitulo(siteManga, cap, onProgress, pastaUri, token
     throw new Error("Capítulo sem páginas.");
   }
 
+  // O cap.id pode ser uma URL (Mugiwaras usa a própria URL como id); as
+  // barras dela criariam subpastas inexistentes no nome do arquivo de cache
+  // e o downloadAsync falha (não cria pastas pai). Achata para um id seguro.
+  const idArquivo = String(cap.id).replace(/[^a-zA-Z0-9]/g, "_");
+
   const temps = [];
   let pdfUri = null;
   try {
@@ -216,7 +221,7 @@ export async function baixarCapitulo(siteManga, cap, onProgress, pastaUri, token
       const url = paginas[i];
       const ext = (url.split("?")[0].split(".").pop() || "jpg").toLowerCase();
       const mime = MIME_IMG[ext] || "image/jpeg";
-      const temp = `${FileSystem.cacheDirectory}cap_${cap.id}_${i}.${ext}`;
+      const temp = `${FileSystem.cacheDirectory}cap_${idArquivo}_${i}.${ext}`;
       await FileSystem.downloadAsync(url, temp);
       temps.push({ uri: temp, mime });
       onProgress?.(((i + 1) / paginas.length) * 0.7);
