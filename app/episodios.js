@@ -20,6 +20,7 @@ import { baixarEpisodios } from "../src/downloads";
 import { useDownload } from "../src/useDownload";
 import { pedirIntervalo } from "../src/intervalo";
 import ProgressoOverlay from "../src/ProgressoOverlay";
+import BotaoFavorito from "../src/BotaoFavorito";
 import { cores } from "../src/theme";
 
 export default function EpisodiosScreen() {
@@ -95,7 +96,22 @@ export default function EpisodiosScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: titulo || "Episódios" }} />
+      <Stack.Screen
+        options={{
+          title: titulo || "Episódios",
+          headerRight: () => (
+            <BotaoFavorito
+              item={{
+                tipo: "anime",
+                site,
+                item_id: url,
+                titulo: titulo || "",
+                imagem: imagem || "",
+              }}
+            />
+          ),
+        }}
+      />
 
       {carregando && (
         <View style={styles.centro}>

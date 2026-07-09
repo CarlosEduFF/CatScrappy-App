@@ -21,6 +21,7 @@ import { baixarCapitulos } from "../src/downloads";
 import { useDownload } from "../src/useDownload";
 import ProgressoOverlay from "../src/ProgressoOverlay";
 import { pedirIntervalo } from "../src/intervalo";
+import BotaoFavorito from "../src/BotaoFavorito";
 import { cores } from "../src/theme";
 
 const IDIOMAS = [
@@ -127,7 +128,22 @@ export default function CapitulosScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: titulo || "Capítulos" }} />
+      <Stack.Screen
+        options={{
+          title: titulo || "Capítulos",
+          headerRight: () => (
+            <BotaoFavorito
+              item={{
+                tipo: "manga",
+                site,
+                item_id: mangaId,
+                titulo: titulo || "",
+                imagem: imagem || "",
+              }}
+            />
+          ),
+        }}
+      />
 
       {siteManga === "mangadex" && (
         <View style={styles.idiomas}>

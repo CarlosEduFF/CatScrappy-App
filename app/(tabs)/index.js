@@ -1,8 +1,8 @@
-// app/index.js — menu inicial: escolher entre anime e mangá.
+// app/(tabs)/index.js — menu inicial: escolher entre anime e mangá.
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { cores } from "../src/theme";
+import { cores } from "../../src/theme";
 
 export default function HomeScreen() {
   const router = useRouter();
