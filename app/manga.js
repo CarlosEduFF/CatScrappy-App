@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -18,10 +19,13 @@ import { cores } from "../src/theme";
 export default function BuscaMangaScreen() {
   const router = useRouter();
   const [site, setSite] = useState(SITES_MANGA[0].id);
+  const [seletorAberto, setSeletorAberto] = useState(false);
   const [termo, setTermo] = useState("");
   const [resultados, setResultados] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState(null);
+
+  const siteAtual = SITES_MANGA.find((s) => s.id === site) || SITES_MANGA[0];
 
   async function buscar() {
     if (!termo.trim()) return;
@@ -55,21 +59,53 @@ export default function BuscaMangaScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.sites}>
-        {SITES_MANGA.map((s) => (
-          <Pressable
-            key={s.id}
-            onPress={() => setSite(s.id)}
-            style={[styles.chip, site === s.id && styles.chipAtivo]}
-          >
-            <Text
-              style={[styles.chipTexto, site === s.id && styles.chipTextoAtivo]}
-            >
-              {s.nome}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <Pressable
+        style={styles.seletorSite}
+        onPress={() => setSeletorAberto(true)}
+      >
+        <Text style={styles.seletorRotulo}>Site</Text>
+        <Text style={styles.seletorValor}>{siteAtual.nome}</Text>
+        <Text style={styles.seletorSeta}>▾</Text>
+      </Pressable>
+
+      <Modal
+        visible={seletorAberto}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSeletorAberto(false)}
+      >
+        <Pressable
+          style={styles.modalFundo}
+          onPress={() => setSeletorAberto(false)}
+        >
+          <View style={styles.modalCaixa}>
+            <Text style={styles.modalTitulo}>Escolha o site</Text>
+            {SITES_MANGA.map((s) => (
+              <Pressable
+                key={s.id}
+                onPress={() => {
+                  setSite(s.id);
+                  setSeletorAberto(false);
+                }}
+                style={[
+                  styles.modalItem,
+                  site === s.id && styles.modalItemAtivo,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modalItemTexto,
+                    site === s.id && styles.modalItemTextoAtivo,
+                  ]}
+                >
+                  {s.nome}
+                </Text>
+                {site === s.id && <Text style={styles.modalCheck}>✓</Text>}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
 
       <View style={styles.buscaLinha}>
         <TextInput
@@ -123,18 +159,53 @@ export default function BuscaMangaScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
-  sites: { flexDirection: "row", gap: 8, marginBottom: 12 },
-  chip: {
-    paddingVertical: 6,
+  seletorSite: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 20,
+    borderRadius: 10,
     backgroundColor: cores.cartao,
     borderWidth: 1,
     borderColor: cores.borda,
+    marginBottom: 12,
   },
-  chipAtivo: { backgroundColor: cores.primaria, borderColor: cores.primaria },
-  chipTexto: { color: cores.textoFraco, fontWeight: "600" },
-  chipTextoAtivo: { color: cores.sobrePrimaria },
+  seletorRotulo: { color: cores.textoFraco, fontWeight: "600" },
+  seletorValor: { color: cores.texto, fontWeight: "700", flex: 1 },
+  seletorSeta: { color: cores.textoFraco, fontSize: 16 },
+  modalFundo: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    padding: 32,
+  },
+  modalCaixa: {
+    backgroundColor: cores.cartao,
+    borderRadius: 14,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  modalTitulo: {
+    color: cores.texto,
+    fontWeight: "700",
+    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  modalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  modalItemAtivo: { backgroundColor: cores.cartaoAtivo },
+  modalItemTexto: { color: cores.texto, fontWeight: "600", flex: 1 },
+  modalItemTextoAtivo: { color: cores.primaria },
+  modalCheck: { color: cores.primaria, fontWeight: "700", fontSize: 16 },
   buscaLinha: { flexDirection: "row", gap: 8, marginBottom: 16 },
   input: {
     flex: 1,
