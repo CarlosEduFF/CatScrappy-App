@@ -17,6 +17,7 @@ import { obterPaginas } from "../src/api";
 import { baixarCapitulos } from "../src/downloads";
 import { useDownload } from "../src/useDownload";
 import ProgressoOverlay from "../src/ProgressoOverlay";
+import PaginaZoom from "../src/PaginaZoom";
 import { cores } from "../src/theme";
 
 const LARGURA = Dimensions.get("window").width;
@@ -112,10 +113,10 @@ export default function LeitorScreen() {
         renderItem={({ item, index }) => {
           if (!alturas[index]) medir(item, index);
           return (
-            <Image
-              source={{ uri: item }}
-              style={{ width: LARGURA, height: alturas[index] || LARGURA * 1.4 }}
-              resizeMode="contain"
+            <PaginaZoom
+              uri={item}
+              largura={LARGURA}
+              altura={alturas[index] || LARGURA * 1.4}
             />
           );
         }}
