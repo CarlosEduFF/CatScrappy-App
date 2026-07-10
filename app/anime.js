@@ -24,6 +24,7 @@ export default function BuscaAnimeScreen() {
   const styles = useMemo(() => criarEstilos(cores), [cores]);
   const [site, setSite] = useState(SITES[0].id);
   const [seletorAberto, setSeletorAberto] = useState(false);
+  const [generoAberto, setGeneroAberto] = useState(false);
   const [termo, setTermo] = useState("");
   const [genero, setGenero] = useState("");
   const [resultados, setResultados] = useState([]);
@@ -145,33 +146,60 @@ export default function BuscaAnimeScreen() {
         </Pressable>
       </View>
 
-      {/* Filtro por gênero (só nos sites que suportam). */}
+      {/* Filtro por gênero (só nos sites que suportam), no mesmo estilo do
+          seletor de site: um botão que abre um modal com a lista. */}
       {generos.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.generos}
-          contentContainerStyle={styles.generosConteudo}
+        <Pressable
+          style={styles.seletorSite}
+          onPress={() => setGeneroAberto(true)}
         >
-          {["Todos", ...generos].map((g) => {
-            const valor = g === "Todos" ? "" : g;
-            const ativo = genero === valor;
-            return (
-              <Pressable
-                key={g}
-                onPress={() => setGenero(valor)}
-                style={[styles.genChip, ativo && styles.genChipAtivo]}
-              >
-                <Text
-                  style={[styles.genChipTexto, ativo && styles.genChipTextoAtivo]}
-                >
-                  {g}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+          <Text style={styles.seletorRotulo}>Gênero</Text>
+          <Text style={styles.seletorValor}>{genero || "Todos"}</Text>
+          <Text style={styles.seletorSeta}>▾</Text>
+        </Pressable>
       )}
+
+      <Modal
+        visible={generoAberto}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGeneroAberto(false)}
+      >
+        <Pressable
+          style={styles.modalFundo}
+          onPress={() => setGeneroAberto(false)}
+        >
+          <View style={styles.modalCaixa}>
+            <Text style={styles.modalTitulo}>Escolha o gênero</Text>
+            <ScrollView>
+              {["Todos", ...generos].map((g) => {
+                const valor = g === "Todos" ? "" : g;
+                const ativo = genero === valor;
+                return (
+                  <Pressable
+                    key={g}
+                    onPress={() => {
+                      setGenero(valor);
+                      setGeneroAberto(false);
+                    }}
+                    style={[styles.modalItem, ativo && styles.modalItemAtivo]}
+                  >
+                    <Text
+                      style={[
+                        styles.modalItemTexto,
+                        ativo && styles.modalItemTextoAtivo,
+                      ]}
+                    >
+                      {g}
+                    </Text>
+                    {ativo && <Text style={styles.modalCheck}>✓</Text>}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
 
       {siteAtual.navegador && (
         <Text style={styles.avisoNavegador}>
@@ -247,6 +275,7 @@ const criarEstilos = (cores) =>
     padding: 8,
     borderWidth: 1,
     borderColor: cores.borda,
+    maxHeight: "70%",
   },
   modalTitulo: {
     color: cores.texto,
@@ -284,19 +313,6 @@ const criarEstilos = (cores) =>
     justifyContent: "center",
   },
   botaoBuscarTexto: { color: cores.sobrePrimaria, fontWeight: "700" },
-  generos: { flexGrow: 0, flexShrink: 0, marginBottom: 14 },
-  generosConteudo: { gap: 8, paddingRight: 8 },
-  genChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    backgroundColor: cores.cartao,
-    borderWidth: 1,
-    borderColor: cores.borda,
-  },
-  genChipAtivo: { backgroundColor: cores.primaria, borderColor: cores.primaria },
-  genChipTexto: { color: cores.textoFraco, fontSize: 13, fontWeight: "600" },
-  genChipTextoAtivo: { color: cores.sobrePrimaria },
   avisoNavegador: {
     color: cores.textoFraco,
     fontSize: 13,
