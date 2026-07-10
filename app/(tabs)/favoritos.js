@@ -153,7 +153,7 @@ export default function FavoritosScreen() {
 
 const criarEstilos = (cores) =>
   StyleSheet.create({
-  container: { flex: 1, padding: 16 },
+  container: { flex: 1, padding: 16, backgroundColor: cores.fundo },
   lista: { flex: 1 },
   filtros: { flexDirection: "row", gap: 8, marginBottom: 14 },
   chip: {

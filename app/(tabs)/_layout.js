@@ -12,6 +12,9 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: cores.fundo },
         headerTintColor: cores.texto,
         headerShadowVisible: false,
+        // Fundo da área de conteúdo de cada aba (sem isso, fica branco no
+        // modo escuro, pois o padrão do navigator é claro).
+        sceneStyle: { backgroundColor: cores.fundo },
         tabBarStyle: {
           backgroundColor: cores.fundo,
           borderTopColor: cores.borda,

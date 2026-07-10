@@ -74,7 +74,12 @@ export default function ContaScreen() {
 
 const criarEstilos = (cores) =>
   StyleSheet.create({
-    container: { flex: 1, padding: 20, justifyContent: "center" },
+    container: {
+      flex: 1,
+      padding: 20,
+      justifyContent: "center",
+      backgroundColor: cores.fundo,
+    },
     // Container central das opções, em cinza (destaca do fundo no dark mode).
     cartaoOpcoes: {
       backgroundColor: cores.cartao,
