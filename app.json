@@ -20,6 +20,12 @@
       "expo-router",
       "expo-video",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "O app precisa de acesso às suas fotos para você escolher a foto de perfil."
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

@@ -10,6 +10,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   entrar as apiEntrar,
   criarConta as apiCriarConta,
+  atualizarPerfil as apiAtualizarPerfil,
+  enviarAvatar as apiEnviarAvatar,
   listarFavoritos,
   adicionarFavorito,
   removerFavorito,
@@ -77,8 +79,8 @@ export function SessaoProvider({ children }) {
     await persistir(r.access_token, r.usuario);
   }
 
-  async function criarConta(email, senha) {
-    const r = await apiCriarConta(email, senha);
+  async function criarConta(email, senha, nome) {
+    const r = await apiCriarConta(email, senha, nome);
     if (r.precisa_confirmar_email || !r.access_token) {
       // Confirmação de e-mail ligada no Supabase: não loga automaticamente.
       return { precisaConfirmar: true };
@@ -92,6 +94,21 @@ export function SessaoProvider({ children }) {
     setUsuario(null);
     setFavoritos([]);
     await AsyncStorage.removeItem(CHAVE);
+  }
+
+  // Atualiza o nome de exibição (persiste o usuário retornado).
+  async function atualizarNome(nome) {
+    if (!token) throw new Error("Entre na sua conta.");
+    const u = await apiAtualizarPerfil(token, { nome });
+    await persistir(token, u);
+  }
+
+  // Envia a foto e persiste o usuário com o novo avatar_url.
+  async function atualizarAvatar(foto) {
+    if (!token) throw new Error("Entre na sua conta.");
+    const r = await apiEnviarAvatar(token, foto);
+    if (r.usuario) await persistir(token, r.usuario);
+    return r.avatar_url;
   }
 
   function ehFavorito(item) {
@@ -131,6 +148,8 @@ export function SessaoProvider({ children }) {
     entrar,
     criarConta,
     sair,
+    atualizarNome,
+    atualizarAvatar,
     ehFavorito,
     alternarFavorito,
     recarregarFavoritos,
@@ -143,4 +162,17 @@ export function useSessao() {
   const ctx = useContext(SessaoContext);
   if (!ctx) throw new Error("useSessao precisa estar dentro de <SessaoProvider>.");
   return ctx;
+}
+
+// Nome de exibição: usa o nome do perfil, senão a parte do e-mail antes do @.
+export function nomeExibicao(usuario) {
+  const nome = usuario?.user_metadata?.nome;
+  if (nome && nome.trim()) return nome.trim();
+  const email = usuario?.email || "";
+  return email.split("@")[0] || "Usuário";
+}
+
+// URL do avatar salvo (ou null se o usuário não escolheu foto).
+export function avatarUrl(usuario) {
+  return usuario?.user_metadata?.avatar_url || null;
 }

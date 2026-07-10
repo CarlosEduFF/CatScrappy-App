@@ -1,21 +1,32 @@
 // src/api.js — cliente do backend CatScrappy (Render).
 //
-// Exceção: o site Mugiwaras é escrapeado direto no celular (src/mugiwaras),
-// porque o Cloudflare dele devolve 403 para o IP de datacenter do Render.
+// Exceção: alguns sites são escrapeados direto no celular, porque o
+// Cloudflare deles devolve 403 para o IP de datacenter do Render mas aceita
+// IPs residenciais/móveis. Hoje: Mugiwaras (mangá), AnimeFire e SushiAnimes.
 
 import Constants from "expo-constants";
 import * as mugiwaras from "./mugiwaras";
+import * as animefire from "./animefire";
+import * as sushianimes from "./sushianimes";
 
 const BASE_URL =
   Constants.expoConfig?.extra?.apiBaseUrl || "https://catscrappy.onrender.com";
 
-// Sites com download/streaming (o backend só expõe estes dois hoje).
+// Sites de anime. Alguns têm um comportamento especial:
+// - navegador: o Cloudflare exige um JS challenge que nem o celular resolve
+//   via fetch, então o app abre a busca no navegador externo (buscaUrl).
 export const SITES = [
   { id: "animefire", nome: "AnimeFire" },
   { id: "animesonline", nome: "AnimesOnline" },
   { id: "sushianimes", nome: "SushiAnimes" },
   { id: "topanimes", nome: "TopAnimes" },
-  { id: "animesdrive", nome: "AnimesDrive" },
+  {
+    id: "animesdrive",
+    nome: "AnimesDrive (abre no navegador)",
+    navegador: true,
+    buscaUrl: (termo) =>
+      `https://animesdrive.online/?s=${encodeURIComponent(termo)}`,
+  },
 ];
 
 async function getJSON(caminho, params) {
@@ -43,17 +54,29 @@ async function getJSON(caminho, params) {
   }
 }
 
-export function buscarAnime(site, nome) {
+export function buscarAnime(site, nome, genero) {
+  if (site === "animefire") return animefire.buscarAnime(nome, genero);
+  if (site === "sushianimes") return sushianimes.buscarAnime(nome);
   return getJSON("/buscar", { site, nome }).then((d) => d.resultados);
 }
 
+// Gêneros disponíveis para o site de anime (vazio = sem filtro por gênero).
+export function generosAnime(site) {
+  if (site === "animefire") return animefire.listarGeneros();
+  return [];
+}
+
 export function listarEpisodios(site, url) {
+  if (site === "animefire") return animefire.listarEpisodios(url);
+  if (site === "sushianimes") return sushianimes.listarEpisodios(url);
   return getJSON("/episodios", { site, url }).then((d) => d.episodios);
 }
 
 export function extrairVideo(site, url) {
   // Retorna { url_video, url_player, is_hls }.
   // url_player já é a URL pronta para tocar (proxy quando for MP4).
+  if (site === "animefire") return animefire.extrairVideo(url);
+  if (site === "sushianimes") return sushianimes.extrairVideo(url);
   return getJSON("/extrair-video", { site, url });
 }
 
@@ -66,9 +89,23 @@ export const SITES_MANGA = [
   { id: "mangalivre", nome: "MangaLivre" },
 ];
 
-export function buscarManga(site, nome) {
+export function buscarManga(site, nome, genero) {
   if (site === "mugiwaras") return mugiwaras.buscarManga(nome);
-  return getJSON("/manga/buscar", { site, nome }).then((d) => d.resultados);
+  const params = { site, nome };
+  if (genero) params.genero = genero;
+  return getJSON("/manga/buscar", params).then((d) => d.resultados);
+}
+
+// Só o MangaDex expõe gêneros por enquanto (lista fixa, sem ir ao servidor).
+const GENEROS_MANGADEX = [
+  "Ação", "Aventura", "Comédia", "Drama", "Fantasia", "Terror",
+  "Histórico", "Isekai", "Mecha", "Mistério", "Psicológico", "Romance",
+  "Sci-Fi", "Slice of Life", "Esportes", "Suspense", "Tragédia",
+];
+
+export function generosManga(site) {
+  if (site === "mangadex") return GENEROS_MANGADEX;
+  return [];
 }
 
 export function listarCapitulos(site, mangaId, idioma = "pt-br") {
@@ -122,12 +159,58 @@ async function requestJSON(caminho, { metodo = "GET", corpo, token, params } = {
   }
 }
 
-export function criarConta(email, senha) {
-  return requestJSON("/auth/signup", { metodo: "POST", corpo: { email, senha } });
+export function criarConta(email, senha, nome) {
+  return requestJSON("/auth/signup", {
+    metodo: "POST",
+    corpo: { email, senha, nome },
+  });
 }
 
 export function entrar(email, senha) {
   return requestJSON("/auth/login", { metodo: "POST", corpo: { email, senha } });
+}
+
+// Atualiza o nome de exibição no perfil.
+export function atualizarPerfil(token, { nome }) {
+  return requestJSON("/perfil", {
+    metodo: "PUT",
+    corpo: { nome },
+    token,
+  }).then((d) => d.usuario);
+}
+
+// Envia a foto de perfil (multipart) e devolve { avatar_url, usuario }.
+export async function enviarAvatar(token, foto) {
+  // foto: { uri, mimeType?, fileName? } vindo do expo-image-picker.
+  const forma = new FormData();
+  const tipo = foto.mimeType || "image/jpeg";
+  const nomeArq = foto.fileName || `avatar.${tipo.split("/")[1] || "jpg"}`;
+  forma.append("foto", { uri: foto.uri, type: tipo, name: nomeArq });
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 90000);
+  try {
+    const resp = await fetch(`${BASE_URL}/perfil/avatar`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }, // não setar Content-Type: o RN põe o boundary
+      body: forma,
+      signal: controller.signal,
+    });
+    if (!resp.ok) {
+      const c = await resp.json().catch(() => ({}));
+      const err = new Error(c.detail || `Erro ${resp.status}`);
+      err.status = resp.status;
+      throw err;
+    }
+    return await resp.json();
+  } catch (e) {
+    if (e.name === "AbortError") {
+      throw new Error("O envio demorou demais. Tente de novo.");
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function listarFavoritos(token) {
@@ -142,6 +225,28 @@ export function removerFavorito(token, { tipo, site, item_id }) {
   return requestJSON("/favoritos", {
     metodo: "DELETE",
     params: { tipo, site, item_id },
+    token,
+  });
+}
+
+// ------------------------------------------------------------------
+// Histórico — episódios/capítulos já vistos, por série.
+// ------------------------------------------------------------------
+export function listarHistorico(token, { tipo, site, item_id }) {
+  return requestJSON("/historico", {
+    params: { tipo, site, item_id },
+    token,
+  }).then((d) => d.historico);
+}
+
+export function marcarVisto(token, item) {
+  return requestJSON("/historico", { metodo: "POST", corpo: item, token });
+}
+
+export function desmarcarVisto(token, { tipo, site, item_id, episodio_id }) {
+  return requestJSON("/historico", {
+    metodo: "DELETE",
+    params: { tipo, site, item_id, episodio_id },
     token,
   });
 }

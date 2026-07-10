@@ -1,21 +1,32 @@
 // app/(tabs)/conta.js — entrar / criar conta, ou ver a conta e sair.
 // Login é opcional: só é preciso para salvar favoritos.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { useSessao } from "../../src/sessao";
-import { cores } from "../../src/theme";
+import { useRouter } from "expo-router";
+import {
+  useSessao,
+  nomeExibicao,
+  avatarUrl,
+} from "../../src/sessao";
+import { useCores } from "../../src/theme";
+import SeletorTema from "../../src/SeletorTema";
 
 export default function ContaScreen() {
+  const cores = useCores();
+  const styles = useMemo(() => criarEstilos(cores), [cores]);
+  const router = useRouter();
   const { logado, usuario, entrar, criarConta, sair } = useSessao();
   const [modo, setModo] = useState("entrar"); // "entrar" | "criar"
+  const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [carregando, setCarregando] = useState(false);
@@ -29,12 +40,16 @@ export default function ContaScreen() {
       setErro("Preencha e-mail e senha.");
       return;
     }
+    if (modo === "criar" && !nome.trim()) {
+      setErro("Escolha um nome de exibição.");
+      return;
+    }
     setCarregando(true);
     try {
       if (modo === "entrar") {
         await entrar(email.trim(), senha);
       } else {
-        const r = await criarConta(email.trim(), senha);
+        const r = await criarConta(email.trim(), senha, nome.trim());
         if (r.precisaConfirmar) {
           setAviso(
             `Conta criada! Enviamos um link de confirmação para ${email.trim()}. ` +
@@ -52,15 +67,36 @@ export default function ContaScreen() {
   }
 
   if (logado) {
+    const foto = avatarUrl(usuario);
+    const nomeUsuario = nomeExibicao(usuario);
     return (
       <View style={styles.container}>
         <View style={styles.perfil}>
-          <Text style={styles.avatar}>👤</Text>
-          <Text style={styles.email}>{usuario?.email || "Conectado"}</Text>
+          {foto ? (
+            <Image source={{ uri: foto }} style={styles.avatarFoto} />
+          ) : (
+            <View style={styles.avatarInicial}>
+              <Text style={styles.avatarInicialTexto}>
+                {nomeUsuario.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.nome}>{nomeUsuario}</Text>
+          <Text style={styles.email}>{usuario?.email || ""}</Text>
         </View>
+
+        <Pressable
+          style={styles.botaoEditar}
+          onPress={() => router.push("/perfil")}
+        >
+          <Text style={styles.botaoEditarTexto}>Editar perfil</Text>
+        </Pressable>
+
         <Pressable style={styles.botaoSair} onPress={sair}>
           <Text style={styles.botaoSairTexto}>Sair da conta</Text>
         </Pressable>
+
+        <SeletorTema />
       </View>
     );
   }
@@ -73,6 +109,17 @@ export default function ContaScreen() {
       <Text style={styles.sub}>
         Salve seus animes e mangás favoritos e acesse de qualquer lugar.
       </Text>
+
+      {modo === "criar" && (
+        <TextInput
+          style={styles.input}
+          placeholder="Nome de exibição"
+          placeholderTextColor={cores.textoFraco}
+          value={nome}
+          onChangeText={setNome}
+          autoCapitalize="words"
+        />
+      )}
 
       <TextInput
         style={styles.input}
@@ -119,11 +166,14 @@ export default function ContaScreen() {
             : "Já tem conta? Entrar"}
         </Text>
       </Pressable>
+
+      <SeletorTema />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores) =>
+  StyleSheet.create({
   container: { flex: 1, padding: 20, justifyContent: "center", gap: 12 },
   titulo: { color: cores.texto, fontSize: 24, fontWeight: "700" },
   sub: { color: cores.textoFraco, marginBottom: 8 },
@@ -147,9 +197,37 @@ const styles = StyleSheet.create({
   alternar: { color: cores.primaria, textAlign: "center", marginTop: 8 },
   erro: { color: cores.erro, textAlign: "center" },
   aviso: { color: cores.textoFraco, textAlign: "center" },
-  perfil: { alignItems: "center", gap: 12, marginBottom: 24 },
-  avatar: { fontSize: 56 },
-  email: { color: cores.texto, fontSize: 18, fontWeight: "600" },
+  perfil: { alignItems: "center", gap: 6, marginBottom: 24 },
+  avatarFoto: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    marginBottom: 6,
+    backgroundColor: cores.cartaoAtivo,
+  },
+  avatarInicial: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    marginBottom: 6,
+    backgroundColor: cores.primaria,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInicialTexto: {
+    color: cores.sobrePrimaria,
+    fontSize: 44,
+    fontWeight: "700",
+  },
+  nome: { color: cores.texto, fontSize: 22, fontWeight: "700" },
+  email: { color: cores.textoFraco, fontSize: 14 },
+  botaoEditar: {
+    backgroundColor: cores.primaria,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  botaoEditarTexto: { color: cores.sobrePrimaria, fontWeight: "700", fontSize: 16 },
   botaoSair: {
     backgroundColor: cores.cartao,
     borderRadius: 10,
@@ -159,4 +237,4 @@ const styles = StyleSheet.create({
     borderColor: cores.borda,
   },
   botaoSairTexto: { color: cores.erro, fontWeight: "700", fontSize: 16 },
-});
+  });
