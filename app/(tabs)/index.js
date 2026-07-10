@@ -10,7 +10,8 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { SITES, SITES_MANGA } from "../../src/api";
 import { useCores } from "../../src/theme";
 
@@ -48,14 +49,40 @@ function renderSite(s, styles) {
   );
 }
 
+const FILTROS_SITE = [
+  { id: "todos", nome: "Todos" },
+  { id: "anime", nome: "📺 Animes" },
+  { id: "manga", nome: "📖 Mangás" },
+];
+
 export default function HomeScreen() {
   const router = useRouter();
   const cores = useCores();
   const styles = useMemo(() => criarEstilos(cores), [cores]);
   const [sitesAberto, setSitesAberto] = useState(false);
+  const [filtroSite, setFiltroSite] = useState("todos");
 
   return (
     <View style={styles.container}>
+      {/* Botão "sites usados" na barra superior (header desta aba). */}
+      <Tabs.Screen
+        options={{
+          headerRight: () => (
+            <Pressable
+              onPress={() => setSitesAberto(true)}
+              hitSlop={12}
+              style={styles.headerBtn}
+            >
+              <Ionicons
+                name="globe-outline"
+                size={22}
+                color={cores.primaria}
+              />
+            </Pressable>
+          ),
+        }}
+      />
+
       <Text style={styles.subtitulo}>O que você quer fazer?</Text>
 
       <Pressable style={styles.opcao} onPress={() => router.push("/anime")}>
@@ -74,11 +101,6 @@ export default function HomeScreen() {
         </View>
       </Pressable>
 
-      {/* Botão singelo que abre a lista de sites usados. */}
-      <Pressable style={styles.linkSites} onPress={() => setSitesAberto(true)}>
-        <Text style={styles.linkSitesTexto}>Ver sites usados</Text>
-      </Pressable>
-
       <Modal
         visible={sitesAberto}
         transparent
@@ -92,12 +114,45 @@ export default function HomeScreen() {
           <View style={styles.modalCaixa}>
             <Text style={styles.modalTitulo}>Sites usados</Text>
             <Text style={styles.modalSub}>Toque para abrir no navegador</Text>
-            <ScrollView>
-              <Text style={styles.grupo}>📺 Animes</Text>
-              {SITES.map((s) => renderSite(s, styles))}
 
-              <Text style={styles.grupo}>📖 Mangás</Text>
-              {SITES_MANGA.map((s) => renderSite(s, styles))}
+            {/* Filtro por categoria. */}
+            <View style={styles.filtros}>
+              {FILTROS_SITE.map((f) => {
+                const ativo = filtroSite === f.id;
+                return (
+                  <Pressable
+                    key={f.id}
+                    onPress={() => setFiltroSite(f.id)}
+                    style={[styles.chip, ativo && styles.chipAtivo]}
+                  >
+                    <Text
+                      style={[styles.chipTexto, ativo && styles.chipTextoAtivo]}
+                    >
+                      {f.nome}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <ScrollView>
+              {filtroSite !== "manga" && (
+                <>
+                  {filtroSite === "todos" && (
+                    <Text style={styles.grupo}>📺 Animes</Text>
+                  )}
+                  {SITES.map((s) => renderSite(s, styles))}
+                </>
+              )}
+
+              {filtroSite !== "anime" && (
+                <>
+                  {filtroSite === "todos" && (
+                    <Text style={styles.grupo}>📖 Mangás</Text>
+                  )}
+                  {SITES_MANGA.map((s) => renderSite(s, styles))}
+                </>
+              )}
             </ScrollView>
           </View>
         </Pressable>
@@ -108,7 +163,13 @@ export default function HomeScreen() {
 
 const criarEstilos = (cores) =>
   StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: "center", gap: 16 },
+  container: {
+    flex: 1,
+    padding: 20,
+    justifyContent: "center",
+    gap: 16,
+    backgroundColor: cores.fundo,
+  },
   subtitulo: {
     color: cores.textoFraco,
     fontSize: 16,
@@ -129,12 +190,7 @@ const criarEstilos = (cores) =>
   textos: { flex: 1 },
   titulo: { color: cores.texto, fontSize: 20, fontWeight: "700" },
   desc: { color: cores.textoFraco, marginTop: 4 },
-  linkSites: { alignSelf: "center", paddingVertical: 10, marginTop: 4 },
-  linkSitesTexto: {
-    color: cores.primaria,
-    fontWeight: "600",
-    fontSize: 14,
-  },
+  headerBtn: { paddingHorizontal: 12 },
   modalFundo: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -154,7 +210,20 @@ const criarEstilos = (cores) =>
     fontWeight: "700",
     fontSize: 18,
   },
-  modalSub: { color: cores.textoFraco, fontSize: 12, marginBottom: 6 },
+  modalSub: { color: cores.textoFraco, fontSize: 12, marginBottom: 10 },
+  filtros: { flexDirection: "row", gap: 8, marginBottom: 6 },
+  chip: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignItems: "center",
+    backgroundColor: cores.cartaoAtivo,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  chipAtivo: { backgroundColor: cores.primaria, borderColor: cores.primaria },
+  chipTexto: { color: cores.textoFraco, fontWeight: "600", fontSize: 12 },
+  chipTextoAtivo: { color: cores.sobrePrimaria },
   grupo: {
     color: cores.textoFraco,
     fontWeight: "700",

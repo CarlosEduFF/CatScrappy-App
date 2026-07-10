@@ -20,10 +20,7 @@ export const SITES = [
   { id: "animesonline", nome: "AnimesOnline", url: "https://animesonline.cloud" },
   { id: "sushianimes", nome: "SushiAnimes", url: "https://sushianimes.com.br" },
   { id: "topanimes", nome: "TopAnimes", url: "https://topanimes.net" },
-  {
-    id: "animesdrive",
-    nome: "AnimesDrive (abre no navegador)",
-    url: "https://animesdrive.online",
+  { id: "animesdrive", nome: "AnimesDrive (abre no navegador)", url: "https://animesdrive.online",
     navegador: true,
     buscaUrl: (termo) =>
       `https://animesdrive.online/?s=${encodeURIComponent(termo)}`,
