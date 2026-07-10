@@ -1,12 +1,15 @@
 // src/PaginaZoom.js — uma página de mangá com pinch-to-zoom.
 //
-// Envolve a imagem num gesto de pinça (dois dedos) que escala a página,
-// combinado com um arrastar (um dedo) que só age quando há zoom — assim,
-// em escala 1, o arrastar vertical é entregue à FlatList do leitor e a
-// rolagem entre páginas continua normal. Duplo-toque alterna 1x/2x.
+// Envolve a imagem num gesto de pinça (dois dedos) que escala a página.
+// O arrastar (um dedo) que move a imagem ampliada só fica ATIVO quando há
+// zoom (escala > 1); em escala 1 ele é desabilitado, então o toque vertical
+// passa direto para a FlatList do leitor e a rolagem entre páginas funciona.
+// Duplo-toque alterna 1x/2x.
 
+import { useState } from "react";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -23,7 +26,12 @@ export default function PaginaZoom({ uri, largura, altura }) {
   const inicioX = useSharedValue(0);
   const inicioY = useSharedValue(0);
 
-  // Mantém a imagem dentro de limites razoáveis ao soltar os dedos.
+  // Espelho na JS thread do "tem zoom?", para habilitar/desabilitar o Pan.
+  // Enquanto false, o Pan não captura o toque e a FlatList pode rolar.
+  const [temZoom, setTemZoom] = useState(false);
+
+  // Mantém a imagem dentro de limites razoáveis ao soltar os dedos e
+  // sincroniza o estado de zoom (para (des)ativar o arrasto).
   function normalizar() {
     "worklet";
     if (escala.value < 1) {
@@ -39,6 +47,7 @@ export default function PaginaZoom({ uri, largura, altura }) {
     } else {
       escalaSalva.value = escala.value;
     }
+    runOnJS(setTemZoom)(escala.value > 1.01);
   }
 
   const pinca = Gesture.Pinch()
@@ -49,25 +58,18 @@ export default function PaginaZoom({ uri, largura, altura }) {
       normalizar();
     });
 
-  // Arrastar a imagem quando há zoom. Em escala 1 o onUpdate não translada
-  // nada, então o toque não "vira" um arrasto e a rolagem vertical da
-  // FlatList continua funcionando normalmente entre as páginas.
+  // Arrastar a imagem quando há zoom. Só é habilitado (enabled) quando
+  // temZoom é true — em escala 1 o Pan nem existe e a rolagem da FlatList
+  // recebe o toque normalmente.
   const arrasto = Gesture.Pan()
+    .enabled(temZoom)
     .onStart(() => {
       inicioX.value = transX.value;
       inicioY.value = transY.value;
     })
     .onUpdate((e) => {
-      if (escala.value <= 1) return;
       transX.value = inicioX.value + e.translationX;
       transY.value = inicioY.value + e.translationY;
-    })
-    .onEnd(() => {
-      // Sem zoom, garante a imagem centralizada.
-      if (escala.value <= 1) {
-        transX.value = withTiming(0);
-        transY.value = withTiming(0);
-      }
     });
 
   const duploToque = Gesture.Tap()
@@ -78,9 +80,11 @@ export default function PaginaZoom({ uri, largura, altura }) {
         escalaSalva.value = 1;
         transX.value = withTiming(0);
         transY.value = withTiming(0);
+        runOnJS(setTemZoom)(false);
       } else {
         escala.value = withTiming(ESCALA_DUPLO_TOQUE);
         escalaSalva.value = ESCALA_DUPLO_TOQUE;
+        runOnJS(setTemZoom)(true);
       }
     });
 
