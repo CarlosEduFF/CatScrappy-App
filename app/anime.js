@@ -1,39 +1,62 @@
 // app/anime.js — busca e seleção de site + resultados de anime.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Image,
+  Linking,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { SITES, buscarAnime } from "../src/api";
-import { cores } from "../src/theme";
+import { SITES, buscarAnime, generosAnime } from "../src/api";
+import { useCores } from "../src/theme";
 
 export default function BuscaAnimeScreen() {
   const router = useRouter();
+  const cores = useCores();
+  const styles = useMemo(() => criarEstilos(cores), [cores]);
   const [site, setSite] = useState(SITES[0].id);
   const [seletorAberto, setSeletorAberto] = useState(false);
   const [termo, setTermo] = useState("");
+  const [genero, setGenero] = useState("");
   const [resultados, setResultados] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState(null);
 
   const siteAtual = SITES.find((s) => s.id === site) || SITES[0];
+  const generos = useMemo(() => generosAnime(site), [site]);
+
+  // Ao trocar de site, limpa o gênero (ele é específico do site).
+  function trocarSite(novo) {
+    setSite(novo);
+    setGenero("");
+    setSeletorAberto(false);
+  }
 
   async function buscar() {
-    if (!termo.trim()) return;
+    // Com gênero é possível buscar sem termo (lista o catálogo do gênero).
+    if (!termo.trim() && !genero) return;
+
+    // Sites com JS challenge do Cloudflare (animesdrive) não passam por fetch
+    // nem no celular; abrimos a busca no navegador externo, que resolve o
+    // challenge naturalmente.
+    if (siteAtual.navegador) {
+      Linking.openURL(siteAtual.buscaUrl(termo.trim()));
+      return;
+    }
+
     setCarregando(true);
     setErro(null);
     setResultados([]);
     try {
-      const animes = await buscarAnime(site, termo.trim());
+      const animes = await buscarAnime(site, termo.trim(), genero);
       setResultados(animes);
       if (animes.length === 0) setErro("Nenhum anime encontrado.");
     } catch (e) {
@@ -83,10 +106,7 @@ export default function BuscaAnimeScreen() {
             {SITES.map((s) => (
               <Pressable
                 key={s.id}
-                onPress={() => {
-                  setSite(s.id);
-                  setSeletorAberto(false);
-                }}
+                onPress={() => trocarSite(s.id)}
                 style={[
                   styles.modalItem,
                   site === s.id && styles.modalItemAtivo,
@@ -119,9 +139,45 @@ export default function BuscaAnimeScreen() {
           autoCorrect={false}
         />
         <Pressable style={styles.botaoBuscar} onPress={buscar}>
-          <Text style={styles.botaoBuscarTexto}>Buscar</Text>
+          <Text style={styles.botaoBuscarTexto}>
+            {siteAtual.navegador ? "Abrir" : "Buscar"}
+          </Text>
         </Pressable>
       </View>
+
+      {/* Filtro por gênero (só nos sites que suportam). */}
+      {generos.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.generos}
+          contentContainerStyle={styles.generosConteudo}
+        >
+          {["Todos", ...generos].map((g) => {
+            const valor = g === "Todos" ? "" : g;
+            const ativo = genero === valor;
+            return (
+              <Pressable
+                key={g}
+                onPress={() => setGenero(valor)}
+                style={[styles.genChip, ativo && styles.genChipAtivo]}
+              >
+                <Text
+                  style={[styles.genChipTexto, ativo && styles.genChipTextoAtivo]}
+                >
+                  {g}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      {siteAtual.navegador && (
+        <Text style={styles.avisoNavegador}>
+          Este site abre no navegador do celular para assistir.
+        </Text>
+      )}
 
       {carregando && (
         <View style={styles.centro}>
@@ -138,7 +194,10 @@ export default function BuscaAnimeScreen() {
         data={resultados}
         keyExtractor={(item, i) => item.url_detalhes + i}
         renderItem={({ item }) => (
-          <Pressable style={styles.cartao} onPress={() => abrirAnime(item)}>
+          <Pressable
+            style={({ focused }) => [styles.cartao, focused && styles.cartaoFocado]}
+            onPress={() => abrirAnime(item)}
+          >
             {!!item.imagem && (
               <Image source={{ uri: item.imagem }} style={styles.capa} />
             )}
@@ -158,7 +217,8 @@ export default function BuscaAnimeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores) =>
+  StyleSheet.create({
   container: { flex: 1, padding: 16 },
   seletorSite: {
     flexDirection: "row",
@@ -207,7 +267,7 @@ const styles = StyleSheet.create({
   modalItemTexto: { color: cores.texto, fontWeight: "600", flex: 1 },
   modalItemTextoAtivo: { color: cores.primaria },
   modalCheck: { color: cores.primaria, fontWeight: "700", fontSize: 16 },
-  buscaLinha: { flexDirection: "row", gap: 8, marginBottom: 16 },
+  buscaLinha: { flexDirection: "row", gap: 8, marginBottom: 12 },
   input: {
     flex: 1,
     backgroundColor: cores.cartao,
@@ -224,6 +284,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   botaoBuscarTexto: { color: cores.sobrePrimaria, fontWeight: "700" },
+  generos: { flexGrow: 0, flexShrink: 0, marginBottom: 14 },
+  generosConteudo: { gap: 8, paddingRight: 8 },
+  genChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: cores.cartao,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  genChipAtivo: { backgroundColor: cores.primaria, borderColor: cores.primaria },
+  genChipTexto: { color: cores.textoFraco, fontSize: 13, fontWeight: "600" },
+  genChipTextoAtivo: { color: cores.sobrePrimaria },
+  avisoNavegador: {
+    color: cores.textoFraco,
+    fontSize: 13,
+    marginTop: -8,
+    marginBottom: 12,
+  },
   centro: { alignItems: "center", padding: 24, gap: 12 },
   aviso: { color: cores.textoFraco, textAlign: "center" },
   erro: { color: cores.erro, textAlign: "center", marginVertical: 12 },
@@ -233,9 +312,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: cores.borda,
     gap: 12,
+  },
+  // Destaque de foco (navegação por D-pad/teclado em TV/projetor).
+  cartaoFocado: {
+    backgroundColor: cores.cartaoAtivo,
+    borderColor: cores.primaria,
   },
   capa: {
     width: 64,
@@ -247,4 +331,4 @@ const styles = StyleSheet.create({
   cartaoTitulo: { color: cores.texto, fontSize: 16, fontWeight: "600" },
   cartaoAno: { color: cores.textoFraco, marginTop: 4 },
   cartaoSinopse: { color: cores.textoFraco, fontSize: 12, marginTop: 6 },
-});
+  });
