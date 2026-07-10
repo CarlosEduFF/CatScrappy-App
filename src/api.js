@@ -16,13 +16,14 @@ const BASE_URL =
 // - navegador: o Cloudflare exige um JS challenge que nem o celular resolve
 //   via fetch, então o app abre a busca no navegador externo (buscaUrl).
 export const SITES = [
-  { id: "animefire", nome: "AnimeFire" },
-  { id: "animesonline", nome: "AnimesOnline" },
-  { id: "sushianimes", nome: "SushiAnimes" },
-  { id: "topanimes", nome: "TopAnimes" },
+  { id: "animefire", nome: "AnimeFire", url: "https://animefire.io" },
+  { id: "animesonline", nome: "AnimesOnline", url: "https://animesonline.cloud" },
+  { id: "sushianimes", nome: "SushiAnimes", url: "https://sushianimes.com.br" },
+  { id: "topanimes", nome: "TopAnimes", url: "https://topanimes.net" },
   {
     id: "animesdrive",
     nome: "AnimesDrive (abre no navegador)",
+    url: "https://animesdrive.online",
     navegador: true,
     buscaUrl: (termo) =>
       `https://animesdrive.online/?s=${encodeURIComponent(termo)}`,
@@ -84,9 +85,9 @@ export function extrairVideo(site, url) {
 // Mangá — MangaDex e Mugiwaras (One Piece e outros, pt-br)
 // ------------------------------------------------------------------
 export const SITES_MANGA = [
-  { id: "mangadex", nome: "MangaDex" },
-  { id: "mugiwaras", nome: "Mugiwaras" },
-  { id: "mangalivre", nome: "MangaLivre" },
+  { id: "mangadex", nome: "MangaDex", url: "https://mangadex.org" },
+  { id: "mugiwaras", nome: "Mugiwaras", url: "https://mugiwarasoficial.com" },
+  { id: "mangalivre", nome: "MangaLivre", url: "https://mangalivre.blog" },
 ];
 
 export function buscarManga(site, nome, genero) {
