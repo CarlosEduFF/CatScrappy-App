@@ -181,19 +181,23 @@ export function atualizarPerfil(token, { nome }) {
 
 // Envia a foto de perfil (multipart) e devolve { avatar_url, usuario }.
 export async function enviarAvatar(token, foto) {
-  // foto: { uri, mimeType?, fileName? } vindo do expo-image-picker.
-  const forma = new FormData();
+  // foto: { uri, mimeType? } vindo do expo-image-picker.
+  // Envia os BYTES da imagem como corpo binário puro (Content-Type = o tipo
+  // da imagem), não multipart — assim a API não depende de python-multipart.
   const tipo = foto.mimeType || "image/jpeg";
-  const nomeArq = foto.fileName || `avatar.${tipo.split("/")[1] || "jpg"}`;
-  forma.append("foto", { uri: foto.uri, type: tipo, name: nomeArq });
+  const resposta = await fetch(foto.uri); // lê o arquivo local
+  const blob = await resposta.blob();
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 90000);
   try {
     const resp = await fetch(`${BASE_URL}/perfil/avatar`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` }, // não setar Content-Type: o RN põe o boundary
-      body: forma,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": tipo,
+      },
+      body: blob,
       signal: controller.signal,
     });
     if (!resp.ok) {
