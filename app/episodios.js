@@ -21,11 +21,15 @@ import { useDownload } from "../src/useDownload";
 import { pedirIntervalo } from "../src/intervalo";
 import ProgressoOverlay from "../src/ProgressoOverlay";
 import BotaoFavorito from "../src/BotaoFavorito";
-import { cores } from "../src/theme";
+import { useHistorico } from "../src/useHistorico";
+import { useCores } from "../src/theme";
 
 export default function EpisodiosScreen() {
+  const cores = useCores();
+  const styles = useMemo(() => criarEstilos(cores), [cores]);
   const { site, url, titulo, imagem, sinopse } = useLocalSearchParams();
   const router = useRouter();
+  const historico = useHistorico({ tipo: "anime", site, itemId: url });
   const [episodios, setEpisodios] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
@@ -68,6 +72,12 @@ export default function EpisodiosScreen() {
   }, [site, url]);
 
   function assistir(ep) {
+    // Marca como visto ao abrir (idempotente; sem login, apenas ignora).
+    historico.marcar({
+      episodio_id: ep.url_pagina,
+      numero: ep.numero || "",
+      titulo: ep.titulo || "",
+    });
     router.push({
       pathname: "/player",
       // "anime" vai junto para o player nomear a subpasta de download.
@@ -154,6 +164,28 @@ export default function EpisodiosScreen() {
         </View>
       )}
 
+      {/* Progresso de episódios vistos (só com login e algum visto). */}
+      {historico.logado && !carregando && !erro && episodios.length > 0 && (
+        <View style={styles.progresso}>
+          <View style={styles.progressoFundo}>
+            <View
+              style={[
+                styles.progressoBarra,
+                {
+                  width: `${Math.min(
+                    100,
+                    (historico.total / episodios.length) * 100
+                  )}%`,
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.progressoTexto}>
+            {historico.total}/{episodios.length} vistos
+          </Text>
+        </View>
+      )}
+
       {!carregando && !erro && episodios.length > TAM_PAGINA && (
         <>
           <TextInput
@@ -202,12 +234,53 @@ export default function EpisodiosScreen() {
       <FlatList
         data={visiveis}
         keyExtractor={(item, i) => item.url_pagina + i}
-        renderItem={({ item }) => (
-          <Pressable style={styles.cartao} onPress={() => assistir(item)}>
-            <Text style={styles.cartaoTitulo}>{item.titulo}</Text>
-            <Text style={styles.play}>▶</Text>
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          const visto = historico.estaVisto(item.url_pagina);
+          return (
+            <Pressable
+              style={({ focused }) => [
+                styles.cartao,
+                focused && styles.cartaoFocado,
+              ]}
+              onPress={() => assistir(item)}
+            >
+              {({ focused }) => (
+                <>
+                  <Text
+                    style={[
+                      styles.cartaoTitulo,
+                      focused && styles.cartaoTituloFocado,
+                      visto && styles.cartaoTituloVisto,
+                    ]}
+                  >
+                    {item.titulo}
+                  </Text>
+                  {/* Botão de marcar/desmarcar visto (só logado). */}
+                  {historico.logado ? (
+                    <Pressable
+                      hitSlop={10}
+                      onPress={() =>
+                        historico
+                          .alternar({
+                            episodio_id: item.url_pagina,
+                            numero: item.numero || "",
+                            titulo: item.titulo || "",
+                          })
+                          .catch(() => {})
+                      }
+                    >
+                      <Text style={visto ? styles.visto : styles.naoVisto}>
+                        {visto ? "✓" : "○"}
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <Text style={styles.play}>▶</Text>
+                  )}
+                </>
+              )}
+            </Pressable>
+          );
+        }}
       />
 
       <ProgressoOverlay
@@ -221,7 +294,8 @@ export default function EpisodiosScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores) =>
+  StyleSheet.create({
   container: { flex: 1, padding: 16 },
   centro: { alignItems: "center", padding: 24, gap: 12 },
   aviso: { color: cores.textoFraco },
@@ -285,6 +359,16 @@ const styles = StyleSheet.create({
     borderColor: cores.borda,
   },
   acaoTexto: { color: cores.texto, fontWeight: "600", fontSize: 13 },
+  progresso: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
+  progressoFundo: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: cores.cartaoAtivo,
+    overflow: "hidden",
+  },
+  progressoBarra: { height: "100%", backgroundColor: cores.primaria },
+  progressoTexto: { color: cores.textoFraco, fontSize: 12, fontWeight: "600" },
   cartao: {
     flexDirection: "row",
     alignItems: "center",
@@ -293,9 +377,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 10,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: cores.borda,
   },
+  // Destaque de foco (navegação por D-pad/teclado em TV/projetor): borda
+  // laranja e fundo mais claro deixam claro qual episódio está selecionado.
+  cartaoFocado: {
+    backgroundColor: cores.cartaoAtivo,
+    borderColor: cores.primaria,
+  },
   cartaoTitulo: { color: cores.texto, fontSize: 15, flex: 1 },
+  cartaoTituloFocado: { color: cores.primaria, fontWeight: "700" },
+  // Episódio já visto: texto esmaecido.
+  cartaoTituloVisto: { color: cores.textoFraco },
   play: { color: cores.primaria, fontSize: 18, marginLeft: 12 },
-});
+  visto: { color: cores.primaria, fontSize: 20, marginLeft: 12, fontWeight: "700" },
+  naoVisto: { color: cores.textoFraco, fontSize: 20, marginLeft: 12 },
+  });

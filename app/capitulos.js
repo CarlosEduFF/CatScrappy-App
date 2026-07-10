@@ -22,7 +22,8 @@ import { useDownload } from "../src/useDownload";
 import ProgressoOverlay from "../src/ProgressoOverlay";
 import { pedirIntervalo } from "../src/intervalo";
 import BotaoFavorito from "../src/BotaoFavorito";
-import { cores } from "../src/theme";
+import { useHistorico } from "../src/useHistorico";
+import { useCores } from "../src/theme";
 
 const IDIOMAS = [
   { id: "pt-br", nome: "PT-BR" },
@@ -32,9 +33,12 @@ const IDIOMAS = [
 ];
 
 export default function CapitulosScreen() {
+  const cores = useCores();
+  const styles = useMemo(() => criarEstilos(cores), [cores]);
   const { site, mangaId, titulo, imagem, sinopse } = useLocalSearchParams();
   const router = useRouter();
   const siteManga = site || "mangadex";
+  const historico = useHistorico({ tipo: "manga", site: siteManga, itemId: mangaId });
   const [capitulos, setCapitulos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
@@ -113,6 +117,12 @@ export default function CapitulosScreen() {
   }
 
   function ler(cap) {
+    // Marca como lido ao abrir (idempotente; sem login, apenas ignora).
+    historico.marcar({
+      episodio_id: cap.id,
+      numero: cap.numero || "",
+      titulo: rotuloCap(cap),
+    });
     router.push({
       pathname: "/leitor",
       // "numero" nomeia o PDF e "manga" a subpasta, se baixar pelo leitor.
@@ -207,6 +217,28 @@ export default function CapitulosScreen() {
         </View>
       )}
 
+      {/* Progresso de capítulos lidos (só com login e algum lido). */}
+      {historico.logado && !carregando && !erro && capitulos.length > 0 && (
+        <View style={styles.progresso}>
+          <View style={styles.progressoFundo}>
+            <View
+              style={[
+                styles.progressoBarra,
+                {
+                  width: `${Math.min(
+                    100,
+                    (historico.total / capitulos.length) * 100
+                  )}%`,
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.progressoTexto}>
+            {historico.total}/{capitulos.length} lidos
+          </Text>
+        </View>
+      )}
+
       {!carregando && !erro && capitulos.length > TAM_PAGINA && (
         <>
           <TextInput
@@ -255,17 +287,57 @@ export default function CapitulosScreen() {
       <FlatList
         data={visiveis}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <Pressable style={styles.cartao} onPress={() => ler(item)}>
-            <Text style={styles.cartaoTitulo}>{rotuloCap(item)}</Text>
-            {idioma === "todos" && !!item.idioma && (
-              <Text style={styles.lingua}>{item.idioma}</Text>
-            )}
-            {!!item.paginas && (
-              <Text style={styles.paginasCap}>{item.paginas} pág.</Text>
-            )}
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          const lido = historico.estaVisto(item.id);
+          return (
+            <Pressable
+              style={({ focused }) => [
+                styles.cartao,
+                focused && styles.cartaoFocado,
+              ]}
+              onPress={() => ler(item)}
+            >
+              {({ focused }) => (
+                <>
+                  <Text
+                    style={[
+                      styles.cartaoTitulo,
+                      focused && styles.cartaoTituloFocado,
+                      lido && styles.cartaoTituloVisto,
+                    ]}
+                  >
+                    {rotuloCap(item)}
+                  </Text>
+                  {idioma === "todos" && !!item.idioma && (
+                    <Text style={styles.lingua}>{item.idioma}</Text>
+                  )}
+                  {!!item.paginas && (
+                    <Text style={styles.paginasCap}>{item.paginas} pág.</Text>
+                  )}
+                  {/* Botão de marcar/desmarcar lido (só logado). */}
+                  {historico.logado && (
+                    <Pressable
+                      hitSlop={10}
+                      onPress={() =>
+                        historico
+                          .alternar({
+                            episodio_id: item.id,
+                            numero: item.numero || "",
+                            titulo: rotuloCap(item),
+                          })
+                          .catch(() => {})
+                      }
+                    >
+                      <Text style={lido ? styles.visto : styles.naoVisto}>
+                        {lido ? "✓" : "○"}
+                      </Text>
+                    </Pressable>
+                  )}
+                </>
+              )}
+            </Pressable>
+          );
+        }}
       />
 
       <ProgressoOverlay
@@ -279,7 +351,8 @@ export default function CapitulosScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores) =>
+  StyleSheet.create({
   container: { flex: 1, padding: 16 },
   centro: { alignItems: "center", padding: 24, gap: 12 },
   aviso: { color: cores.textoFraco },
@@ -326,6 +399,16 @@ const styles = StyleSheet.create({
     borderColor: cores.borda,
   },
   acaoTexto: { color: cores.texto, fontWeight: "600", fontSize: 13 },
+  progresso: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
+  progressoFundo: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: cores.cartaoAtivo,
+    overflow: "hidden",
+  },
+  progressoBarra: { height: "100%", backgroundColor: cores.primaria },
+  progressoTexto: { color: cores.textoFraco, fontSize: 12, fontWeight: "600" },
   busca: {
     backgroundColor: cores.cartao,
     borderRadius: 10,
@@ -363,10 +446,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 10,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: cores.borda,
   },
+  // Destaque de foco (navegação por D-pad/teclado em TV/projetor).
+  cartaoFocado: {
+    backgroundColor: cores.cartaoAtivo,
+    borderColor: cores.primaria,
+  },
   cartaoTitulo: { color: cores.texto, fontSize: 15, flex: 1 },
+  cartaoTituloFocado: { color: cores.primaria, fontWeight: "700" },
+  // Capítulo já lido: texto esmaecido.
+  cartaoTituloVisto: { color: cores.textoFraco },
   lingua: {
     color: cores.primaria,
     fontSize: 11,
@@ -375,4 +466,6 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   paginasCap: { color: cores.textoFraco, fontSize: 13, marginLeft: 12 },
-});
+  visto: { color: cores.primaria, fontSize: 20, marginLeft: 12, fontWeight: "700" },
+  naoVisto: { color: cores.textoFraco, fontSize: 20, marginLeft: 12 },
+  });
