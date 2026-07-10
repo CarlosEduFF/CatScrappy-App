@@ -23,6 +23,7 @@
 
 import * as FileSystem from "expo-file-system/legacy";
 import * as Print from "expo-print";
+import * as ImageManipulator from "expo-image-manipulator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { copyToSaf } from "../modules/saf-copy";
 import { extrairVideo, obterPaginas } from "./api";
@@ -215,15 +216,28 @@ export async function baixarCapitulo(siteManga, cap, onProgress, pastaUri, token
   const temps = [];
   let pdfUri = null;
   try {
-    // 1) Baixa as páginas para o cache (0 → 0.7 do progresso).
+    // 1) Baixa cada página e converte para JPEG no cache (0 → 0.7).
+    // Duas razões para SEMPRE reprocessar via ImageManipulator:
+    //  - o WebView do expo-print não renderiza WebP em PDF (sai em branco), e
+    //    o Mugiwaras serve as páginas em .webp;
+    //  - redimensionar (1080px) + JPEG q=0.7 reduz ~10x, evitando estourar o
+    //    WebView com o capítulo inteiro em base64.
     for (let i = 0; i < paginas.length; i++) {
       if (token?.cancelado) throw new Error(CANCELADO);
       const url = paginas[i];
       const ext = (url.split("?")[0].split(".").pop() || "jpg").toLowerCase();
-      const mime = MIME_IMG[ext] || "image/jpeg";
-      const temp = `${FileSystem.cacheDirectory}cap_${idArquivo}_${i}.${ext}`;
-      await FileSystem.downloadAsync(url, temp);
-      temps.push({ uri: temp, mime });
+      const bruto = `${FileSystem.cacheDirectory}cap_${idArquivo}_${i}_bruto.${ext}`;
+      await FileSystem.downloadAsync(url, bruto);
+
+      // Converte para JPEG (obrigatório: WebP não renderiza no PDF). Se o
+      // ImageManipulator falhar, é erro real — não adianta usar o bruto webp.
+      const out = await ImageManipulator.manipulateAsync(
+        bruto,
+        [{ resize: { width: 1080 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      await FileSystem.deleteAsync(bruto, { idempotent: true }).catch(() => {});
+      temps.push({ uri: out.uri, mime: "image/jpeg" });
       onProgress?.(((i + 1) / paginas.length) * 0.7);
     }
 
