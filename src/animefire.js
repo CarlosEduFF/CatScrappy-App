@@ -114,13 +114,25 @@ function parseCards(html) {
 
 // Busca por nome e/ou gênero. Sem termo, com gênero, lista o catálogo do
 // gênero (/genero/<slug>). O /pesquisar/ espera espaços como hífen.
+// Monta o slug de busca do AnimeFire: minúsculas, sem acento, espaços viram
+// hífen. O site é sensível a maiúsculas ("One-piece" dá 404, "one-piece" ok)
+// e não aceita acentos na URL.
+function slugBusca(nome) {
+  return nome
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // remove acentos
+    .replace(/\s+/g, "-");
+}
+
 export async function buscarAnime(nome, genero) {
   const slug = genero && GENEROS[genero];
   if (slug && !nome.trim()) {
     const html = await texto(`${BASE}/genero/${slug}`);
     return parseCards(html);
   }
-  const termo = nome.trim().replace(/\s+/g, "-");
+  const termo = slugBusca(nome);
   const html = await texto(`${BASE}/pesquisar/${encodeURIComponent(termo)}`);
   const resultados = parseCards(html);
   // Com termo E gênero, filtra o resultado da busca pelos que também
