@@ -73,8 +73,8 @@ export default function FavoritosScreen() {
         <Text style={styles.aviso}>
           Entre na sua conta para salvar e ver seus favoritos.
         </Text>
-        <Pressable style={styles.botao} onPress={() => router.push("/conta")}>
-          <Text style={styles.botaoTexto}>Ir para Conta</Text>
+        <Pressable style={styles.botao} onPress={() => router.push("/login")}>
+          <Text style={styles.botaoTexto}>Entrar</Text>
         </Pressable>
       </View>
     );

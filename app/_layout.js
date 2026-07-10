@@ -32,6 +32,7 @@ function Navegacao() {
         <Stack.Screen name="capitulos" options={{ title: "Capítulos" }} />
         <Stack.Screen name="leitor" options={{ title: "Leitura" }} />
         <Stack.Screen name="perfil" options={{ title: "Editar perfil" }} />
+        <Stack.Screen name="login" options={{ title: "Entrar" }} />
       </Stack>
       {/* Modal de intervalo compartilhado, acionado via pedirIntervalo() */}
       <IntervaloModal ref={intervaloRef} />

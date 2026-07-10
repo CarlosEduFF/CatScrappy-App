@@ -21,7 +21,7 @@ export default function BotaoFavorito({ item }) {
         "Crie uma conta ou entre para salvar favoritos.",
         [
           { text: "Agora não", style: "cancel" },
-          { text: "Ir para Conta", onPress: () => router.push("/conta") },
+          { text: "Entrar", onPress: () => router.push("/login") },
         ]
       );
       return;
