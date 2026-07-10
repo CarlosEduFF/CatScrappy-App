@@ -2,6 +2,7 @@
 // "Ocultar" fecha o overlay sem parar o download (o progresso continua na
 // barra de notificação); "Cancelar" interrompe o lote.
 
+import { useMemo } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -10,7 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { cores } from "./theme";
+import { useCores } from "./theme";
 
 export default function ProgressoOverlay({
   visivel,
@@ -19,6 +20,8 @@ export default function ProgressoOverlay({
   onOcultar,
   onCancelar,
 }) {
+  const cores = useCores();
+  const styles = useMemo(() => criarEstilos(cores), [cores]);
   const pct = Math.round((fracao || 0) * 100);
   return (
     <Modal
@@ -57,7 +60,8 @@ export default function ProgressoOverlay({
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores) =>
+  StyleSheet.create({
   fundo: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",
@@ -97,4 +101,4 @@ const styles = StyleSheet.create({
   cancelar: { backgroundColor: "transparent", borderColor: cores.erro },
   botaoTexto: { color: cores.texto, fontWeight: "700" },
   cancelarTexto: { color: cores.erro, fontWeight: "700" },
-});
+  });

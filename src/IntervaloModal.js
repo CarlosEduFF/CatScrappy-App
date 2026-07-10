@@ -1,6 +1,11 @@
 // src/IntervaloModal.js — modal de seleção de intervalo (montado no layout raiz).
 
-import { useImperativeHandle, forwardRef, useState } from "react";
+import {
+  useImperativeHandle,
+  forwardRef,
+  useMemo,
+  useState,
+} from "react";
 import {
   Modal,
   Pressable,
@@ -10,9 +15,11 @@ import {
   View,
 } from "react-native";
 import { filtrarIntervalo } from "./intervalo";
-import { cores } from "./theme";
+import { useCores } from "./theme";
 
 function IntervaloModal(props, ref) {
+  const cores = useCores();
+  const styles = useMemo(() => criarEstilos(cores), [cores]);
   const [visivel, setVisivel] = useState(false);
   const [itens, setItens] = useState([]);
   const [unidade, setUnidade] = useState("item");
@@ -84,7 +91,8 @@ function IntervaloModal(props, ref) {
 
 export default forwardRef(IntervaloModal);
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores) =>
+  StyleSheet.create({
   fundo: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",
@@ -122,4 +130,4 @@ const styles = StyleSheet.create({
   ok: { backgroundColor: cores.primaria },
   botaoTexto: { color: cores.texto, fontWeight: "700" },
   okTexto: { color: cores.sobrePrimaria, fontWeight: "700" },
-});
+  });

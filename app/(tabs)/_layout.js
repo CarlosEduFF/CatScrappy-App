@@ -2,9 +2,10 @@
 
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { cores } from "../../src/theme";
+import { useCores } from "../../src/theme";
 
 export default function TabsLayout() {
+  const cores = useCores();
   return (
     <Tabs
       screenOptions={{

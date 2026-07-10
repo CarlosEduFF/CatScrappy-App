@@ -1,7 +1,7 @@
 // app/player.js — extrai o link e toca no player interno; permite abrir no
 // VLC e baixar o episódio para a pasta do anime.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,9 +17,11 @@ import { extrairVideo } from "../src/api";
 import { baixarEpisodios } from "../src/downloads";
 import { useDownload } from "../src/useDownload";
 import ProgressoOverlay from "../src/ProgressoOverlay";
-import { cores } from "../src/theme";
+import { useCores } from "../src/theme";
 
 export default function PlayerScreen() {
+  const cores = useCores();
+  const styles = useMemo(() => criarEstilos(cores), [cores]);
   const { site, url, titulo, anime } = useLocalSearchParams();
   const [fonte, setFonte] = useState(null); // { url_player, url_video, is_hls }
   const [carregando, setCarregando] = useState(true);
@@ -134,7 +136,8 @@ export default function PlayerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores) =>
+  StyleSheet.create({
   container: { flex: 1 },
   centro: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   aviso: { color: cores.textoFraco },
@@ -153,4 +156,4 @@ const styles = StyleSheet.create({
     borderColor: cores.borda,
   },
   botaoTexto: { color: cores.texto, fontWeight: "700", fontSize: 15 },
-});
+  });

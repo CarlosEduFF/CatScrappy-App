@@ -1,13 +1,16 @@
 // src/BotaoFavorito.js — estrela de favoritar para o header das telas de
 // detalhe (episódios/capítulos). Sem login, avisa que precisa entrar.
 
+import { useMemo } from "react";
 import { Alert, Pressable, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSessao } from "./sessao";
-import { cores } from "./theme";
+import { useCores } from "./theme";
 
 export default function BotaoFavorito({ item }) {
   const router = useRouter();
+  const cores = useCores();
+  const styles = useMemo(() => criarEstilos(cores), [cores]);
   const { logado, ehFavorito, alternarFavorito } = useSessao();
   const favoritado = logado && ehFavorito(item);
 
@@ -39,7 +42,8 @@ export default function BotaoFavorito({ item }) {
   );
 }
 
-const styles = StyleSheet.create({
-  estrela: { fontSize: 24, color: cores.textoFraco },
-  ativa: { color: cores.primaria },
-});
+const criarEstilos = (cores) =>
+  StyleSheet.create({
+    estrela: { fontSize: 24, color: cores.textoFraco },
+    ativa: { color: cores.primaria },
+  });

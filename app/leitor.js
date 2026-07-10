@@ -1,7 +1,7 @@
 // app/leitor.js — leitor de capítulo: páginas em rolagem vertical.
 // O ⬇️ no header baixa o capítulo atual como PDF na pasta do mangá.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -18,11 +18,13 @@ import { baixarCapitulos } from "../src/downloads";
 import { useDownload } from "../src/useDownload";
 import ProgressoOverlay from "../src/ProgressoOverlay";
 import PaginaZoom from "../src/PaginaZoom";
-import { cores } from "../src/theme";
+import { useCores } from "../src/theme";
 
 const LARGURA = Dimensions.get("window").width;
 
 export default function LeitorScreen() {
+  const cores = useCores();
+  const styles = useMemo(() => criarEstilos(cores), [cores]);
   const { site, capituloId, titulo, numero, manga } = useLocalSearchParams();
   const siteManga = site || "mangadex";
   const [paginas, setPaginas] = useState([]);
@@ -133,10 +135,11 @@ export default function LeitorScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   centro: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   aviso: { color: cores.textoFraco },
   erro: { color: cores.erro, textAlign: "center", paddingHorizontal: 24 },
   baixar: { fontSize: 18 },
-});
+  });

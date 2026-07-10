@@ -1,11 +1,14 @@
 // app/(tabs)/index.js — menu inicial: escolher entre anime e mangá.
 
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { cores } from "../../src/theme";
+import { useCores } from "../../src/theme";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const cores = useCores();
+  const styles = useMemo(() => criarEstilos(cores), [cores]);
   return (
     <View style={styles.container}>
       <Text style={styles.subtitulo}>O que você quer fazer?</Text>
@@ -29,7 +32,8 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (cores) =>
+  StyleSheet.create({
   container: { flex: 1, padding: 20, justifyContent: "center", gap: 16 },
   subtitulo: {
     color: cores.textoFraco,
@@ -51,4 +55,4 @@ const styles = StyleSheet.create({
   textos: { flex: 1 },
   titulo: { color: cores.texto, fontSize: 20, fontWeight: "700" },
   desc: { color: cores.textoFraco, marginTop: 4 },
-});
+  });
