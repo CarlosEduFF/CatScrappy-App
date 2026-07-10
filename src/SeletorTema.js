@@ -1,5 +1,6 @@
-// src/SeletorTema.js — escolha de tema: Claro / Escuro / Automático.
-// A preferência é salva pelo TemaProvider (useTema).
+// src/SeletorTema.js — escolha de tema: Claro / Escuro.
+// Quem nunca escolheu segue o sistema (preferência "auto" no TemaProvider);
+// ao tocar Claro ou Escuro, a escolha fica fixa. Não há botão "Automático".
 
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -8,11 +9,10 @@ import { useTema } from "./theme";
 const OPCOES = [
   { id: "light", nome: "Claro" },
   { id: "dark", nome: "Escuro" },
-  { id: "auto", nome: "Automático" },
 ];
 
 export default function SeletorTema() {
-  const { cores, preferencia, setPreferencia } = useTema();
+  const { cores, esquemaEfetivo, setPreferencia } = useTema();
   const styles = useMemo(() => criarEstilos(cores), [cores]);
 
   return (
@@ -20,7 +20,9 @@ export default function SeletorTema() {
       <Text style={styles.rotulo}>Tema</Text>
       <View style={styles.opcoes}>
         {OPCOES.map((o) => {
-          const ativo = preferencia === o.id;
+          // Destaca o botão do tema ATUAL (mesmo quando a preferência é
+          // "auto", segue o sistema e o botão correspondente fica ativo).
+          const ativo = esquemaEfetivo === o.id;
           return (
             <Pressable
               key={o.id}

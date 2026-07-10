@@ -21,14 +21,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const PALETA_ESCURA = {
   esquema: "dark",
   fundo: "#0e0d0b",
-  cartao: "#1b1917",
-  cartaoAtivo: "#282017",
+  // Superfícies (cards, área das opções) em cinza neutro, destacando do
+  // fundo quase-preto. O laranja continua como cor de destaque.
+  cartao: "#2b2b2e",
+  cartaoAtivo: "#3a3a3e",
   texto: "#f7f3ee",
-  textoFraco: "#a89e91",
+  textoFraco: "#b0aeb0",
   primaria: "#f5820d",
   primariaEscura: "#c4670a",
   sobrePrimaria: "#140d06",
-  borda: "#332b22",
+  borda: "#45454a",
   erro: "#ff5d5d",
 };
 
