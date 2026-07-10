@@ -28,13 +28,36 @@ function decodeHtml(s) {
     .replace(/&gt;/g, ">");
 }
 
+// Códigos transitórios da Cloudflare/origem (timeout, origem indisponível):
+// costumam passar numa segunda tentativa.
+const STATUS_TRANSITORIO = new Set([502, 503, 504, 520, 521, 522, 523, 524]);
+
 async function texto(url, opcoes = {}) {
-  const resp = await fetch(url, {
-    headers: { "User-Agent": UA },
-    ...opcoes,
-  });
-  if (!resp.ok) throw new Error(`AnimeFire: erro ${resp.status}`);
-  return resp.text();
+  let ultimoStatus = 0;
+  // Tenta até 3 vezes com uma pausa crescente quando o erro é transitório.
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    if (tentativa > 0) {
+      await new Promise((r) => setTimeout(r, 800 * tentativa));
+    }
+    let resp;
+    try {
+      resp = await fetch(url, { headers: { "User-Agent": UA }, ...opcoes });
+    } catch (e) {
+      ultimoStatus = 0; // falha de rede; tenta de novo
+      continue;
+    }
+    if (resp.ok) return resp.text();
+    ultimoStatus = resp.status;
+    if (!STATUS_TRANSITORIO.has(resp.status)) break; // erro definitivo: não insiste
+  }
+  if (ultimoStatus === 522 || STATUS_TRANSITORIO.has(ultimoStatus)) {
+    throw new Error(
+      "O AnimeFire está fora do ar no momento (erro " +
+        (ultimoStatus || "de conexão") +
+        "). Tente novamente em alguns minutos."
+    );
+  }
+  throw new Error(`AnimeFire: erro ${ultimoStatus || "de conexão"}`);
 }
 
 // Gêneros (nome exibido -> slug da URL /genero/<slug>).
