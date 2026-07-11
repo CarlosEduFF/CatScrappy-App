@@ -15,17 +15,17 @@
 // Episódios em HLS são baixados segmento a segmento e concatenados no
 // destino via append nativo (ver baixarHls e src/hls.js).
 //
-// Mangá: as páginas são baixadas para o cache e viram um único PDF por
-// capítulo (expo-print), copiado para a subpasta do mangá. As imagens são
-// embutidas como base64 no HTML porque o WebView do expo-print não carrega
-// file:// (loadDataWithBaseURL sem allowFileAccess); capítulos são pequenos
-// o bastante para isso não estourar a memória.
+// Mangá: as páginas são baixadas para o cache, comprimidas para JPEG e
+// viram um único PDF por capítulo montado em JS puro (src/pdf.js), copiado
+// para a subpasta do mangá. Não usa expo-print: o WebView dele não carrega
+// um HTML com o capítulo inteiro em base64 (~10 MB+) e imprime um documento
+// vazio — uma página em branco.
 
 import * as FileSystem from "expo-file-system/legacy";
-import * as Print from "expo-print";
 import * as ImageManipulator from "expo-image-manipulator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { copyToSaf } from "../modules/saf-copy";
+import { base64ParaBytes, gerarPdfDeJpegs } from "./pdf";
 import { extrairVideo, obterPaginas } from "./api";
 import { obterSegmentos, resolverUrl } from "./hls";
 
@@ -216,13 +216,13 @@ export async function baixarCapitulo(siteManga, cap, onProgress, pastaUri, token
   const temps = [];
   let pdfUri = null;
   try {
-    // 1) Baixa cada página, converte para JPEG e já obtém o base64 (0 → 0.8).
-    // Converter sempre para JPEG é obrigatório: o WebView do expo-print não
-    // renderiza WebP em PDF (sai em branco), e o Mugiwaras serve as páginas
-    // em .webp. Redimensionar (1080px) + q=0.7 reduz ~10x, evitando estourar
-    // o WebView com o capítulo inteiro. Pedir o base64 direto do manipulator
-    // evita reler o arquivo (cujo URI nem sempre é legível pelo file-system).
-    let corpo = "";
+    // 1) Baixa cada página e converte para JPEG (0 → 0.8). Converter é
+    // obrigatório: o PDF embute JPEG nativamente (/DCTDecode), mas não WebP
+    // — e o Mugiwaras serve as páginas em .webp. Redimensionar (1080px) +
+    // q=0.7 reduz ~10x o tamanho do arquivo final. Pedir o base64 direto do
+    // manipulator evita reler o arquivo (cujo URI nem sempre é legível pelo
+    // file-system).
+    const paginasJpeg = [];
     for (let i = 0; i < paginas.length; i++) {
       if (token?.cancelado) throw new Error(CANCELADO);
       const url = paginas[i];
@@ -244,21 +244,20 @@ export async function baixarCapitulo(siteManga, cap, onProgress, pastaUri, token
       if (!out.base64) {
         throw new Error("Falha ao processar uma página do capítulo.");
       }
-      corpo += `<img src="data:image/jpeg;base64,${out.base64}" />`;
+      paginasJpeg.push({
+        bytes: base64ParaBytes(out.base64),
+        width: out.width,
+        height: out.height,
+      });
       onProgress?.(((i + 1) / paginas.length) * 0.8);
     }
 
-    // 2) Monta o HTML e gera o PDF.
-    const html =
-      "<html><head><meta charset=\"utf-8\"><style>" +
-      "body{margin:0;padding:0}" +
-      "img{width:100%;display:block;page-break-after:always}" +
-      "</style></head><body>" +
-      corpo +
-      "</body></html>";
-
-    const resultado = await Print.printToFileAsync({ html });
-    pdfUri = resultado.uri;
+    // 2) Monta o PDF diretamente dos JPEGs e grava no cache.
+    const pdfBase64 = gerarPdfDeJpegs(paginasJpeg);
+    pdfUri = `${FileSystem.cacheDirectory}cap_${idArquivo}.pdf`;
+    await FileSystem.writeAsStringAsync(pdfUri, pdfBase64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
     onProgress?.(0.95);
 
     // 3) Copia o PDF para a pasta SAF em streaming nativo.
