@@ -216,39 +216,39 @@ export async function baixarCapitulo(siteManga, cap, onProgress, pastaUri, token
   const temps = [];
   let pdfUri = null;
   try {
-    // 1) Baixa cada página e converte para JPEG no cache (0 → 0.7).
-    // Duas razões para SEMPRE reprocessar via ImageManipulator:
-    //  - o WebView do expo-print não renderiza WebP em PDF (sai em branco), e
-    //    o Mugiwaras serve as páginas em .webp;
-    //  - redimensionar (1080px) + JPEG q=0.7 reduz ~10x, evitando estourar o
-    //    WebView com o capítulo inteiro em base64.
+    // 1) Baixa cada página, converte para JPEG e já obtém o base64 (0 → 0.8).
+    // Converter sempre para JPEG é obrigatório: o WebView do expo-print não
+    // renderiza WebP em PDF (sai em branco), e o Mugiwaras serve as páginas
+    // em .webp. Redimensionar (1080px) + q=0.7 reduz ~10x, evitando estourar
+    // o WebView com o capítulo inteiro. Pedir o base64 direto do manipulator
+    // evita reler o arquivo (cujo URI nem sempre é legível pelo file-system).
+    let corpo = "";
     for (let i = 0; i < paginas.length; i++) {
       if (token?.cancelado) throw new Error(CANCELADO);
       const url = paginas[i];
       const ext = (url.split("?")[0].split(".").pop() || "jpg").toLowerCase();
       const bruto = `${FileSystem.cacheDirectory}cap_${idArquivo}_${i}_bruto.${ext}`;
       await FileSystem.downloadAsync(url, bruto);
+      temps.push({ uri: bruto });
 
-      // Converte para JPEG (obrigatório: WebP não renderiza no PDF). Se o
-      // ImageManipulator falhar, é erro real — não adianta usar o bruto webp.
       const out = await ImageManipulator.manipulateAsync(
         bruto,
         [{ resize: { width: 1080 } }],
-        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+        {
+          compress: 0.7,
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true,
+        }
       );
-      await FileSystem.deleteAsync(bruto, { idempotent: true }).catch(() => {});
-      temps.push({ uri: out.uri, mime: "image/jpeg" });
-      onProgress?.(((i + 1) / paginas.length) * 0.7);
+      if (out.uri) temps.push({ uri: out.uri });
+      if (!out.base64) {
+        throw new Error("Falha ao processar uma página do capítulo.");
+      }
+      corpo += `<img src="data:image/jpeg;base64,${out.base64}" />`;
+      onProgress?.(((i + 1) / paginas.length) * 0.8);
     }
 
-    // 2) Monta o HTML (imagens em base64) e gera o PDF (0.7 → 0.95).
-    let corpo = "";
-    for (const pagina of temps) {
-      const b64 = await FileSystem.readAsStringAsync(pagina.uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      corpo += `<img src="data:${pagina.mime};base64,${b64}" />`;
-    }
+    // 2) Monta o HTML e gera o PDF.
     const html =
       "<html><head><meta charset=\"utf-8\"><style>" +
       "body{margin:0;padding:0}" +
@@ -256,7 +256,6 @@ export async function baixarCapitulo(siteManga, cap, onProgress, pastaUri, token
       "</style></head><body>" +
       corpo +
       "</body></html>";
-    onProgress?.(0.8);
 
     const resultado = await Print.printToFileAsync({ html });
     pdfUri = resultado.uri;
