@@ -6,7 +6,6 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSessao, nomeExibicao, avatarUrl } from "../../src/sessao";
 import { useCores } from "../../src/theme";
-import SeletorTema from "../../src/SeletorTema";
 
 export default function ContaScreen() {
   const cores = useCores();
@@ -45,8 +44,6 @@ export default function ContaScreen() {
           <Pressable style={styles.botaoSair} onPress={sair}>
             <Text style={styles.botaoSairTexto}>Sair da conta</Text>
           </Pressable>
-
-          <SeletorTema />
         </View>
       </View>
     );
@@ -65,8 +62,6 @@ export default function ContaScreen() {
         <Pressable style={styles.botao} onPress={() => router.push("/login")}>
           <Text style={styles.botaoTexto}>Entrar ou criar conta</Text>
         </Pressable>
-
-        <SeletorTema />
       </View>
     </View>
   );
