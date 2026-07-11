@@ -8,6 +8,7 @@ import Constants from "expo-constants";
 import * as mugiwaras from "./mugiwaras";
 import * as animefire from "./animefire";
 import * as sushianimes from "./sushianimes";
+import * as animesdigital from "./animesdigital";
 
 const BASE_URL =
   Constants.expoConfig?.extra?.apiBaseUrl || "https://catscrappy.onrender.com";
@@ -17,6 +18,7 @@ const BASE_URL =
 //   via fetch, então o app abre a busca no navegador externo (buscaUrl).
 export const SITES = [
   { id: "animefire", nome: "AnimeFire", url: "https://animefire.io" },
+  { id: "animesdigital", nome: "AnimesDigital", url: "https://animesdigital.org" },
   { id: "animesonline", nome: "AnimesOnline", url: "https://animesonline.cloud" },
   { id: "sushianimes", nome: "SushiAnimes", url: "https://sushianimes.com.br" },
   { id: "topanimes", nome: "TopAnimes", url: "https://topanimes.net" },
@@ -24,6 +26,11 @@ export const SITES = [
     navegador: true,
     buscaUrl: (termo) =>
       `https://animesdrive.online/?s=${encodeURIComponent(termo)}`,
+  },
+  { id: "meusanimes", nome: "MeusAnimes (abre no navegador)", url: "https://meusanimes.blog",
+    navegador: true,
+    buscaUrl: (termo) =>
+      `https://meusanimes.blog/?s=${encodeURIComponent(termo)}`,
   },
 ];
 
@@ -55,6 +62,7 @@ async function getJSON(caminho, params) {
 export function buscarAnime(site, nome, genero) {
   if (site === "animefire") return animefire.buscarAnime(nome, genero);
   if (site === "sushianimes") return sushianimes.buscarAnime(nome);
+  if (site === "animesdigital") return animesdigital.buscarAnime(nome);
   return getJSON("/buscar", { site, nome }).then((d) => d.resultados);
 }
 
@@ -67,6 +75,7 @@ export function generosAnime(site) {
 export function listarEpisodios(site, url) {
   if (site === "animefire") return animefire.listarEpisodios(url);
   if (site === "sushianimes") return sushianimes.listarEpisodios(url);
+  if (site === "animesdigital") return animesdigital.listarEpisodios(url);
   return getJSON("/episodios", { site, url }).then((d) => d.episodios);
 }
 
@@ -75,6 +84,7 @@ export function extrairVideo(site, url) {
   // url_player já é a URL pronta para tocar (proxy quando for MP4).
   if (site === "animefire") return animefire.extrairVideo(url);
   if (site === "sushianimes") return sushianimes.extrairVideo(url);
+  if (site === "animesdigital") return animesdigital.extrairVideo(url);
   return getJSON("/extrair-video", { site, url });
 }
 
