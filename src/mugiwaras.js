@@ -131,5 +131,10 @@ export async function obterPaginas(capUrl) {
     else hi = meio;
   }
 
-  return Array.from({ length: lo }, (_, i) => pagina(i + 1));
+  // Capítulos podem ter buracos na numeração (ex.: o 1188 não tem a página
+  // 6, mas tem a 7-15). Confirma cada página e descarta as que não existem,
+  // senão o download salva o XML de erro 404 do CDN como se fosse imagem.
+  const todas = Array.from({ length: lo }, (_, i) => pagina(i + 1));
+  const checagens = await Promise.all(todas.map(existe));
+  return todas.filter((_, i) => checagens[i]);
 }
