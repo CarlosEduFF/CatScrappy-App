@@ -228,28 +228,41 @@ export async function baixarCapitulo(siteManga, cap, onProgress, pastaUri, token
       const url = paginas[i];
       const ext = (url.split("?")[0].split(".").pop() || "jpg").toLowerCase();
       const bruto = `${FileSystem.cacheDirectory}cap_${idArquivo}_${i}_bruto.${ext}`;
-      await FileSystem.downloadAsync(url, bruto);
       temps.push({ uri: bruto });
 
-      const out = await ImageManipulator.manipulateAsync(
-        bruto,
-        [{ resize: { width: 1080 } }],
-        {
-          compress: 0.7,
-          format: ImageManipulator.SaveFormat.JPEG,
-          base64: true,
+      // Uma página quebrada no servidor (404 que o downloadAsync salva como
+      // arquivo, imagem que não decodifica) não derruba o capítulo: pula a
+      // página, como o próprio site faz.
+      try {
+        const resp = await FileSystem.downloadAsync(url, bruto);
+        if (resp.status < 200 || resp.status >= 300) {
+          throw new Error(`HTTP ${resp.status}`);
         }
-      );
-      if (out.uri) temps.push({ uri: out.uri });
-      if (!out.base64) {
-        throw new Error("Falha ao processar uma página do capítulo.");
+        const out = await ImageManipulator.manipulateAsync(
+          bruto,
+          [{ resize: { width: 1080 } }],
+          {
+            compress: 0.7,
+            format: ImageManipulator.SaveFormat.JPEG,
+            base64: true,
+          }
+        );
+        if (out.uri) temps.push({ uri: out.uri });
+        if (!out.base64) {
+          throw new Error("Falha ao processar uma página do capítulo.");
+        }
+        paginasJpeg.push({
+          bytes: base64ParaBytes(out.base64),
+          width: out.width,
+          height: out.height,
+        });
+      } catch (e) {
+        if (token?.cancelado) throw new Error(CANCELADO);
       }
-      paginasJpeg.push({
-        bytes: base64ParaBytes(out.base64),
-        width: out.width,
-        height: out.height,
-      });
       onProgress?.(((i + 1) / paginas.length) * 0.8);
+    }
+    if (!paginasJpeg.length) {
+      throw new Error("Nenhuma página do capítulo pôde ser baixada.");
     }
 
     // 2) Monta o PDF diretamente dos JPEGs e grava no cache.
