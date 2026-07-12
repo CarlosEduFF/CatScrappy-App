@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -97,16 +98,23 @@ export default function CapitulosScreen() {
     return c.titulo ? `${base} - ${c.titulo}` : base;
   }
 
+  // Capítulos externos (MangaPlus) não têm páginas no MangaDex — nunca
+  // entram em download, só na leitura via navegador.
+  const baixaveis = useMemo(
+    () => capitulos.filter((c) => !c.externo_url),
+    [capitulos]
+  );
+
   function baixarTodos() {
     dl.rodar(
       (onItem, onProgress, token) =>
-        baixarCapitulos(siteManga, capitulos, onItem, onProgress, titulo, token),
+        baixarCapitulos(siteManga, baixaveis, onItem, onProgress, titulo, token),
       "Capítulo"
     );
   }
 
   async function baixarIntervalo() {
-    const selecionados = await pedirIntervalo(capitulos, "capítulo");
+    const selecionados = await pedirIntervalo(baixaveis, "capítulo");
     if (selecionados && selecionados.length) {
       dl.rodar(
         (onItem, onProgress, token) =>
@@ -117,6 +125,12 @@ export default function CapitulosScreen() {
   }
 
   function ler(cap) {
+    // Capítulo licenciado (MangaPlus etc.): não é legível no app, só abre
+    // no site oficial. Não marca como lido nem entra no leitor.
+    if (cap.externo_url) {
+      Linking.openURL(cap.externo_url).catch(() => {});
+      return;
+    }
     // Marca como lido ao abrir (idempotente; sem login, apenas ignora).
     historico.marcar({
       episodio_id: cap.id,
@@ -289,6 +303,7 @@ export default function CapitulosScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
           const lido = historico.estaVisto(item.id);
+          const externo = !!item.externo_url;
           return (
             <Pressable
               style={({ focused }) => [
@@ -304,6 +319,7 @@ export default function CapitulosScreen() {
                       styles.cartaoTitulo,
                       focused && styles.cartaoTituloFocado,
                       lido && styles.cartaoTituloVisto,
+                      externo && styles.cartaoTituloExterno,
                     ]}
                   >
                     {rotuloCap(item)}
@@ -311,11 +327,15 @@ export default function CapitulosScreen() {
                   {idioma === "todos" && !!item.idioma && (
                     <Text style={styles.lingua}>{item.idioma}</Text>
                   )}
-                  {!!item.paginas && (
-                    <Text style={styles.paginasCap}>{item.paginas} pág.</Text>
+                  {externo ? (
+                    <Text style={styles.seloExterno}>🔒 Abrir no site</Text>
+                  ) : (
+                    !!item.paginas && (
+                      <Text style={styles.paginasCap}>{item.paginas} pág.</Text>
+                    )
                   )}
-                  {/* Botão de marcar/desmarcar lido (só logado). */}
-                  {historico.logado && (
+                  {/* Botão de marcar/desmarcar lido (só logado, e não em externos). */}
+                  {historico.logado && !externo && (
                     <Pressable
                       hitSlop={10}
                       onPress={() =>
@@ -466,6 +486,8 @@ const criarEstilos = (cores) =>
     textTransform: "uppercase",
   },
   paginasCap: { color: cores.textoFraco, fontSize: 13, marginLeft: 12 },
+  cartaoTituloExterno: { color: cores.textoFraco },
+  seloExterno: { color: cores.textoFraco, fontSize: 12, marginLeft: 12 },
   visto: { color: cores.primaria, fontSize: 20, marginLeft: 12, fontWeight: "700" },
   naoVisto: { color: cores.textoFraco, fontSize: 20, marginLeft: 12 },
   });
