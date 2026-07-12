@@ -10,6 +10,7 @@ import * as animefire from "./animefire";
 import * as sushianimes from "./sushianimes";
 import * as animesdigital from "./animesdigital";
 import * as fliptru from "./fliptru";
+import * as mangaplus from "./mangaplus";
 
 const BASE_URL =
   Constants.expoConfig?.extra?.apiBaseUrl || "https://catscrappy.onrender.com";
@@ -97,11 +98,13 @@ export const SITES_MANGA = [
   { id: "mugiwaras", nome: "Mugiwaras", url: "https://mugiwarasoficial.com" },
   { id: "mangalivre", nome: "MangaLivre", url: "https://mangalivre.blog" },
   { id: "fliptru", nome: "Fliptru (quadrinhos BR indie)", url: "https://fliptru.com.br" },
+  { id: "mangaplus", nome: "Manga Plus (oficial, inglês)", url: "https://mangaplus.shueisha.co.jp" },
 ];
 
 export function buscarManga(site, nome, genero) {
   if (site === "mugiwaras") return mugiwaras.buscarManga(nome);
   if (site === "fliptru") return fliptru.buscarManga(nome);
+  if (site === "mangaplus") return mangaplus.buscarManga(nome);
   const params = { site, nome };
   if (genero) params.genero = genero;
   return getJSON("/manga/buscar", params).then((d) => d.resultados);
@@ -122,6 +125,7 @@ export function generosManga(site) {
 export function listarCapitulos(site, mangaId, idioma = "pt-br") {
   if (site === "mugiwaras") return mugiwaras.listarCapitulos(mangaId);
   if (site === "fliptru") return fliptru.listarCapitulos(mangaId);
+  if (site === "mangaplus") return mangaplus.listarCapitulos(mangaId);
   // idioma (só MangaDex): pt-br | en | es-la | ... | "todos"
   return getJSON("/manga/capitulos", { site, manga_id: mangaId, idioma }).then(
     (d) => d.capitulos
@@ -131,6 +135,7 @@ export function listarCapitulos(site, mangaId, idioma = "pt-br") {
 export function obterPaginas(site, capituloId) {
   if (site === "mugiwaras") return mugiwaras.obterPaginas(capituloId);
   if (site === "fliptru") return fliptru.obterPaginas(capituloId);
+  if (site === "mangaplus") return mangaplus.obterPaginas(capituloId);
   return getJSON("/manga/paginas", { site, capitulo_id: capituloId }).then(
     (d) => d.paginas
   );
