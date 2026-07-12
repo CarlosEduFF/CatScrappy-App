@@ -80,11 +80,13 @@ const CANCELADO = "Download cancelado.";
 
 // Baixa uma URL para o cache (com progresso) e copia para a pasta SAF.
 // O token (opcional) permite abortar o arquivo em andamento via cancelAsync.
-async function baixarPara(pastaUri, url, nomeArquivo, mime, onProgress, token) {
+// headers (opcional): enviados no request (ex.: Referer que o CDN exige).
+async function baixarPara(pastaUri, url, nomeArquivo, mime, onProgress, token, headers) {
   if (token?.cancelado) throw new Error(CANCELADO);
   const temp = FileSystem.cacheDirectory + nomeArquivo;
 
-  const dl = FileSystem.createDownloadResumable(url, temp, {}, (p) => {
+  const opcoes = headers ? { headers } : {};
+  const dl = FileSystem.createDownloadResumable(url, temp, opcoes, (p) => {
     if (onProgress && p.totalBytesExpectedToWrite > 0) {
       onProgress(p.totalBytesWritten / p.totalBytesExpectedToWrite);
     }
@@ -153,7 +155,7 @@ async function baixarHls(pastaUri, urlM3u8, nomeBase, onProgress, token) {
 export async function baixarEpisodio(site, ep, onProgress, pastaUri, token) {
   const pasta = pastaUri || (await garantirPasta());
 
-  const { url_player } = await extrairVideo(site, ep.url_pagina);
+  const { url_player, headers } = await extrairVideo(site, ep.url_pagina);
   const nomeBase = nomeSeguro(ep.titulo || "episodio");
 
   if (url_player.split("?")[0].endsWith(".m3u8")) {
@@ -166,7 +168,8 @@ export async function baixarEpisodio(site, ep, onProgress, pastaUri, token) {
     nomeBase + ".mp4",
     "video/mp4",
     onProgress,
-    token
+    token,
+    headers
   );
 }
 

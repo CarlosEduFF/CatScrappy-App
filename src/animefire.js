@@ -3,20 +3,17 @@
 // O site fica atrás do Cloudflare, que devolve 403 para IPs de datacenter
 // (o Render, onde a API vive) mas aceita IPs residenciais/móveis. Então o
 // app escrapeia a busca, a lista de episódios e a URL do vídeo direto no
-// celular. O arquivo .mp4 em si vem do CDN lightspeedst.net (que NÃO é
-// bloqueado) e exige o header Referer — por isso a reprodução continua
-// passando pelo /proxy da API, que reenvia o Referer ao CDN.
-
-import Constants from "expo-constants";
+// celular. O arquivo .mp4 vem do CDN lightspeedst.net (que NÃO é bloqueado)
+// e só exige o header Referer — o player (expo-video) e o download mandam
+// esse header direto ao CDN, sem passar pelo /proxy da API. O proxy do Render
+// (free tier, hiberna) engasgava e dava 502 em arquivos grandes, como o filme
+// One Piece: Stampede (~1,5 GB): tocar direto do CDN resolve isso.
 
 const BASE = "https://animefire.io";
 const REFERER = "https://animefire.io/";
 const UA =
   "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) " +
   "Chrome/126.0 Mobile Safari/537.36";
-
-const API_BASE =
-  Constants.expoConfig?.extra?.apiBaseUrl || "https://catscrappy.onrender.com";
 
 function decodeHtml(s) {
   return s
@@ -177,9 +174,10 @@ function pesoQualidade(label) {
 }
 
 // Vídeo: data-video-src aponta pra /video/<slug>/<n>, que devolve JSON com
-// os .mp4 por qualidade. Retorna o mesmo formato do /extrair-video da API:
-// { url_video, url_player, is_hls }. O mp4 exige Referer, então o url_player
-// aponta para o /proxy da API (que reenvia o Referer ao CDN).
+// os .mp4 por qualidade. Retorna { url_video, url_player, is_hls, headers }.
+// O .mp4 do CDN (lightspeedst.net) só exige o header Referer; devolvemos a
+// URL direta e o header, para o player e o download mandarem ao CDN — sem o
+// /proxy da API (que hibernava e falhava em arquivos grandes).
 export async function extrairVideo(urlEpisodio) {
   const html = await texto(urlEpisodio);
 
@@ -218,10 +216,7 @@ export async function extrairVideo(urlEpisodio) {
   const melhor = fontes[fontes.length - 1];
   const urlVideo = melhor.src;
 
-  // O CDN exige Referer; passa pelo /proxy da API (mesma lógica do backend).
-  const urlPlayer =
-    `${API_BASE}/proxy?url=${encodeURIComponent(urlVideo)}` +
-    `&referer=${encodeURIComponent(REFERER)}`;
-
-  return { url_video: urlVideo, url_player: urlPlayer, is_hls: false };
+  // O CDN exige apenas o Referer; toca/baixa direto, sem o /proxy da API.
+  const headers = { Referer: REFERER, "User-Agent": UA };
+  return { url_video: urlVideo, url_player: urlVideo, is_hls: false, headers };
 }

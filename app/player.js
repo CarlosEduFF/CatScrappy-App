@@ -45,8 +45,17 @@ export default function PlayerScreen() {
     };
   }, [site, url]);
 
-  // O player só recebe uma URL quando ela existir; enquanto isso fica nulo.
-  const player = useVideoPlayer(fonte?.url_player ?? null, (p) => {
+  // Fonte do player: alguns sites (AnimeFire) exigem headers (Referer) no
+  // request do vídeo — passa-os junto da URI. Sem headers, uma URL simples.
+  const fontePlayer = useMemo(() => {
+    if (!fonte?.url_player) return null;
+    return fonte.headers
+      ? { uri: fonte.url_player, headers: fonte.headers }
+      : fonte.url_player;
+  }, [fonte]);
+
+  // O player só recebe uma fonte quando ela existir; enquanto isso fica nulo.
+  const player = useVideoPlayer(fontePlayer, (p) => {
     p.play();
   });
 
@@ -110,7 +119,7 @@ export default function PlayerScreen() {
 
           <View style={styles.info}>
             <Text style={styles.tipo}>
-              {fonte.is_hls ? "Stream HLS" : "Vídeo MP4 (via proxy)"}
+              {fonte.is_hls ? "Stream HLS" : "Vídeo MP4"}
             </Text>
           </View>
 
