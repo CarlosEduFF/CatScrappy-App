@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { useSessao } from "../src/sessao";
+import { recuperarSenha } from "../src/api";
 import { useCores } from "../src/theme";
 
 export default function LoginScreen() {
@@ -58,6 +59,30 @@ export default function LoginScreen() {
         }
       }
       setSenha("");
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  // Redefinição de senha: o Supabase manda um link por e-mail. A resposta é
+  // a mesma exista ou não a conta, para não revelar quais e-mails têm
+  // cadastro — por isso o aviso é condicional ("se houver uma conta").
+  async function esqueciSenha() {
+    setErro(null);
+    setAviso(null);
+    if (!email.trim()) {
+      setErro("Informe seu e-mail para receber o link de redefinição.");
+      return;
+    }
+    setCarregando(true);
+    try {
+      const r = await recuperarSenha(email.trim());
+      setAviso(
+        r?.mensagem ||
+          "Se houver uma conta com este e-mail, o link de redefinição foi enviado."
+      );
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -120,6 +145,12 @@ export default function LoginScreen() {
           )}
         </Pressable>
 
+        {modo === "entrar" && (
+          <Pressable onPress={esqueciSenha} disabled={carregando}>
+            <Text style={styles.esqueci}>Esqueci minha senha</Text>
+          </Pressable>
+        )}
+
         <Pressable
           onPress={() => {
             setModo(modo === "entrar" ? "criar" : "entrar");
@@ -169,6 +200,12 @@ const criarEstilos = (cores) =>
     },
     botaoTexto: { color: cores.sobrePrimaria, fontWeight: "700", fontSize: 16 },
     alternar: { color: cores.primaria, textAlign: "center", marginTop: 8 },
+    esqueci: {
+      color: cores.textoFraco,
+      textAlign: "center",
+      fontSize: 13,
+      textDecorationLine: "underline",
+    },
     erro: { color: cores.erro, textAlign: "center" },
     aviso: { color: cores.textoFraco, textAlign: "center" },
   });

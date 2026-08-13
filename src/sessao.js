@@ -1,17 +1,24 @@
 // src/sessao.js — sessão do usuário (login opcional) + favoritos.
 //
-// Guarda o token e o usuário no AsyncStorage para persistir entre aberturas.
-// Login é opcional: o app funciona sem conta; só os favoritos exigem estar
-// logado. Os favoritos são carregados do servidor ao entrar e mantidos em
-// memória para o botão de ⭐ responder na hora.
+// Guarda os tokens e o usuário no AsyncStorage para persistir entre
+// aberturas. Login é opcional: o app funciona sem conta; só os favoritos
+// exigem estar logado. Os favoritos são carregados do servidor ao entrar e
+// mantidos em memória para o botão de ⭐ responder na hora.
+//
+// Persistência: o access_token do Supabase expira em 1h, então guardá-lo
+// sozinho fazia o usuário ser deslogado toda vez que voltasse ao app depois
+// desse prazo. O refresh_token (que não expira) é salvo junto e trocado por
+// um novo par na abertura e sempre que a API responder 401. Como ele é de
+// uso único, cada renovação devolve o próximo — e os dois são regravados.
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   entrar as apiEntrar,
   criarConta as apiCriarConta,
   atualizarPerfil as apiAtualizarPerfil,
   enviarAvatar as apiEnviarAvatar,
+  renovarSessao as apiRenovarSessao,
   listarFavoritos,
   adicionarFavorito,
   removerFavorito,
@@ -30,6 +37,13 @@ export function SessaoProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
   const [favoritos, setFavoritos] = useState([]);
   const [carregando, setCarregando] = useState(true);
+  // O refresh fica em ref, não em estado: ele é lido dentro de funções
+  // assíncronas que não devem esperar um novo render para enxergar o valor
+  // atualizado (e trocá-lo não precisa repintar nada).
+  const refreshRef = useRef(null);
+  // Evita renovações simultâneas: o refresh_token é de uso único, então duas
+  // chamadas em paralelo invalidariam uma à outra e derrubariam a sessão.
+  const renovacaoRef = useRef(null);
 
   // Restaura a sessão salva ao abrir o app.
   useEffect(() => {
@@ -37,9 +51,14 @@ export function SessaoProvider({ children }) {
       try {
         const bruto = await AsyncStorage.getItem(CHAVE);
         if (bruto) {
-          const { token: t, usuario: u } = JSON.parse(bruto);
+          const { token: t, refresh: r, usuario: u } = JSON.parse(bruto);
+          refreshRef.current = r || null;
           setToken(t);
           setUsuario(u);
+          // O access_token guardado quase sempre já expirou (dura 1h).
+          // Renova de saída para o app abrir logado; se o refresh falhar,
+          // renovar() encerra a sessão e o usuário entra de novo.
+          if (r) await renovar();
         }
       } catch (e) {
         // Sessão corrompida: ignora e segue deslogado.
@@ -58,8 +77,16 @@ export function SessaoProvider({ children }) {
     try {
       setFavoritos(await listarFavoritos(token));
     } catch (e) {
-      // Token expirado: desloga silenciosamente.
-      if (e.status === 401) await sair();
+      if (e.status !== 401) return;
+      // Access token expirado: renova e tenta de novo antes de desistir.
+      // Só desloga se o refresh também falhar (renovar() já cuida disso).
+      const novo = await renovar();
+      if (!novo) return;
+      try {
+        setFavoritos(await listarFavoritos(novo));
+      } catch (e2) {
+        // Falhou mesmo com token novo: mantém os favoritos que já estavam.
+      }
     }
   }, [token]);
 
@@ -67,16 +94,47 @@ export function SessaoProvider({ children }) {
     recarregarFavoritos();
   }, [recarregarFavoritos]);
 
-  async function persistir(t, u) {
+  async function persistir(t, u, r) {
+    // Sem refresh novo (ex.: atualizar perfil), mantém o que já estava.
+    const refresh = r || refreshRef.current || null;
+    refreshRef.current = refresh;
     setToken(t);
     setUsuario(u);
-    await AsyncStorage.setItem(CHAVE, JSON.stringify({ token: t, usuario: u }));
+    await AsyncStorage.setItem(
+      CHAVE,
+      JSON.stringify({ token: t, refresh, usuario: u })
+    );
+  }
+
+  // Troca o refresh_token por um par novo. Devolve o access_token novo, ou
+  // null se a sessão não puder mais ser renovada (aí já saiu).
+  async function renovar() {
+    const refresh = refreshRef.current;
+    if (!refresh) return null;
+    // Uma renovação por vez: as demais aguardam o mesmo resultado.
+    if (renovacaoRef.current) return renovacaoRef.current;
+
+    renovacaoRef.current = (async () => {
+      try {
+        const r = await apiRenovarSessao(refresh);
+        if (!r?.access_token) throw new Error("sem token");
+        await persistir(r.access_token, r.usuario || usuario, r.refresh_token);
+        return r.access_token;
+      } catch (e) {
+        // Refresh inválido/já usado: sessão encerrada de verdade.
+        await sair();
+        return null;
+      } finally {
+        renovacaoRef.current = null;
+      }
+    })();
+    return renovacaoRef.current;
   }
 
   async function entrar(email, senha) {
     const r = await apiEntrar(email, senha);
     if (!r.access_token) throw new Error("Não foi possível entrar.");
-    await persistir(r.access_token, r.usuario);
+    await persistir(r.access_token, r.usuario, r.refresh_token);
   }
 
   async function criarConta(email, senha, nome) {
@@ -85,11 +143,12 @@ export function SessaoProvider({ children }) {
       // Confirmação de e-mail ligada no Supabase: não loga automaticamente.
       return { precisaConfirmar: true };
     }
-    await persistir(r.access_token, r.usuario);
+    await persistir(r.access_token, r.usuario, r.refresh_token);
     return { precisaConfirmar: false };
   }
 
   async function sair() {
+    refreshRef.current = null;
     setToken(null);
     setUsuario(null);
     setFavoritos([]);
@@ -153,6 +212,9 @@ export function SessaoProvider({ children }) {
     ehFavorito,
     alternarFavorito,
     recarregarFavoritos,
+    // Exposto para quem chama a API direto (ex.: useHistorico) poder repetir
+    // a requisição com um token novo em vez de tratar o 401 como deslogado.
+    renovar,
   };
 
   return <SessaoContext.Provider value={valor}>{children}</SessaoContext.Provider>;

@@ -14,7 +14,7 @@ function chave(episodioId) {
 }
 
 export function useHistorico({ tipo, site, itemId }) {
-  const { token, logado } = useSessao();
+  const { token, logado, renovar } = useSessao();
   // Set de episodio_id vistos (busca O(1) para pintar a lista).
   const [vistos, setVistos] = useState(() => new Set());
   const [carregado, setCarregado] = useState(false);
@@ -31,8 +31,23 @@ export function useHistorico({ tipo, site, itemId }) {
       const lista = await listarHistorico(token, alvo);
       setVistos(new Set(lista.map((h) => chave(h.episodio_id))));
     } catch (e) {
+      // Access token expirado: renova e tenta de novo antes de desistir,
+      // senão o histórico apareceria vazio (nada marcado como visto).
+      let ok = false;
+      if (e.status === 401) {
+        try {
+          const novo = await renovar?.();
+          if (novo) {
+            const lista = await listarHistorico(novo, alvo);
+            setVistos(new Set(lista.map((h) => chave(h.episodio_id))));
+            ok = true;
+          }
+        } catch (e2) {
+          // Continua para o fallback abaixo.
+        }
+      }
       // Sem histórico visível não deve travar a tela.
-      setVistos(new Set());
+      if (!ok) setVistos(new Set());
     } finally {
       setCarregado(true);
     }

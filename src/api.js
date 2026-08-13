@@ -188,6 +188,24 @@ export function entrar(email, senha) {
   return requestJSON("/auth/login", { metodo: "POST", corpo: { email, senha } });
 }
 
+// Dispara o e-mail de redefinição de senha. Responde ok mesmo se o e-mail
+// não tiver conta (não revela quais endereços estão cadastrados).
+export function recuperarSenha(email) {
+  return requestJSON("/auth/recuperar-senha", {
+    metodo: "POST",
+    corpo: { email },
+  });
+}
+
+// Troca o refresh_token por um novo par de tokens (o access_token do
+// Supabase expira em 1h). Devolve { access_token, refresh_token, usuario }.
+export function renovarSessao(refreshToken) {
+  return requestJSON("/auth/refresh", {
+    metodo: "POST",
+    corpo: { refresh_token: refreshToken },
+  });
+}
+
 // Atualiza o nome de exibição no perfil.
 export function atualizarPerfil(token, { nome }) {
   return requestJSON("/perfil", {
