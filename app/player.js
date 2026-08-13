@@ -13,8 +13,8 @@ import {
   Alert,
   AppState,
   Linking,
+  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -41,6 +41,7 @@ export default function PlayerScreen() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [emPip, setEmPip] = useState(false);
+  const [velocidadeAberta, setVelocidadeAberta] = useState(false);
   const videoRef = useRef(null);
   const dl = useDownload();
 
@@ -195,6 +196,46 @@ export default function PlayerScreen() {
     }
   }
 
+  // Navegação entre episódios: fica logo abaixo do vídeo, ao alcance do
+  // polegar, e some quando a lista não está em memória (aberto pelo
+  // histórico) ou durante o PiP.
+  function Navegacao() {
+    if (irmaos.total === 0) return null;
+    return (
+      <View style={styles.navegacao}>
+        <Pressable
+          style={[styles.navBotao, !irmaos.anterior && styles.navBotaoInativo]}
+          disabled={!irmaos.anterior}
+          onPress={() => irPara(irmaos.anterior)}
+        >
+          <Text
+            style={[styles.navTexto, !irmaos.anterior && styles.navTextoInativo]}
+            numberOfLines={1}
+          >
+            ⏮ Anterior
+          </Text>
+        </Pressable>
+
+        <Text style={styles.navContador}>
+          {irmaos.indice + 1}/{irmaos.total}
+        </Text>
+
+        <Pressable
+          style={[styles.navBotao, !irmaos.proximo && styles.navBotaoInativo]}
+          disabled={!irmaos.proximo}
+          onPress={() => irPara(irmaos.proximo)}
+        >
+          <Text
+            style={[styles.navTexto, !irmaos.proximo && styles.navTextoInativo]}
+            numberOfLines={1}
+          >
+            Próximo ⏭
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: titulo || "Assistir" }} />
@@ -212,48 +253,10 @@ export default function PlayerScreen() {
         </View>
       )}
 
-      {/* Navegação entre episódios. Fica fora do bloco do vídeo de propósito:
-          quando a extração falha, pular para o próximo é justamente o que
-          resolve. Escondida em PiP e quando a lista não está em memória. */}
-      {!emPip && irmaos.total > 0 && (
-        <View style={styles.navegacao}>
-          <Pressable
-            style={[styles.navBotao, !irmaos.anterior && styles.navBotaoInativo]}
-            disabled={!irmaos.anterior}
-            onPress={() => irPara(irmaos.anterior)}
-          >
-            <Text
-              style={[
-                styles.navTexto,
-                !irmaos.anterior && styles.navTextoInativo,
-              ]}
-              numberOfLines={1}
-            >
-              ⏮ Anterior
-            </Text>
-          </Pressable>
-
-          <Text style={styles.navContador}>
-            {irmaos.indice + 1}/{irmaos.total}
-          </Text>
-
-          <Pressable
-            style={[styles.navBotao, !irmaos.proximo && styles.navBotaoInativo]}
-            disabled={!irmaos.proximo}
-            onPress={() => irPara(irmaos.proximo)}
-          >
-            <Text
-              style={[
-                styles.navTexto,
-                !irmaos.proximo && styles.navTextoInativo,
-              ]}
-              numberOfLines={1}
-            >
-              Próximo ⏭
-            </Text>
-          </Pressable>
-        </View>
-      )}
+      {/* Sem vídeo na tela (extração falhou), a navegação aparece aqui:
+          pular para o próximo episódio é justamente o que resolve. Com
+          vídeo, ela vai logo abaixo dele — ver <Navegacao /> adiante. */}
+      {erro && !emPip && <Navegacao />}
 
       {fonte && !erro && (
         <>
@@ -276,50 +279,35 @@ export default function PlayerScreen() {
               isso os botões apareceriam ao voltar para o app por baixo dela. */}
           {!emPip && (
             <>
-              <View style={styles.info}>
-                <Text style={styles.tipo}>
-                  {fonte.is_hls ? "Stream HLS" : "Vídeo MP4"}
-                </Text>
-              </View>
+              {/* Trocar de episódio é o controle mais usado: fica colado no
+                  vídeo, antes das ações secundárias. */}
+              <Navegacao />
 
-              {/* Linha própria e em destaque: é a ação mais usada durante a
-                  reprodução. A duração vem das configurações. */}
-              <Pressable style={styles.pular} onPress={pularAbertura}>
-                <Text style={styles.pularTexto}>
-                  ⏩ Pular abertura ({saltoAbertura}s)
-                </Text>
-              </Pressable>
-
-              {/* Velocidade: o menu nativo do Android só oferece até 2x e
-                  esquece a escolha a cada episódio. Aqui vai além e a
-                  preferência fica salva. */}
-              <View style={styles.velocidade}>
-                <Text style={styles.velocidadeRotulo}>Velocidade</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.velocidadeOpcoes}
+              {/* Pular abertura e velocidade dividem a linha: a faixa de 8
+                  chips ocupava espaço demais e exigia arrastar para alcançar
+                  as velocidades maiores. */}
+              <View style={styles.linhaReproducao}>
+                <Pressable style={styles.pular} onPress={pularAbertura}>
+                  <Text style={styles.pularTexto} numberOfLines={1}>
+                    ⏩ Pular {saltoAbertura}s
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.velBotao,
+                    velocidade !== 1 && styles.velBotaoAtivo,
+                  ]}
+                  onPress={() => setVelocidadeAberta(true)}
                 >
-                  {VELOCIDADES.map((v) => {
-                    const ativo = v === velocidade;
-                    return (
-                      <Pressable
-                        key={v}
-                        style={[styles.velChip, ativo && styles.velChipAtivo]}
-                        onPress={() => setVelocidade(v)}
-                      >
-                        <Text
-                          style={[
-                            styles.velChipTexto,
-                            ativo && styles.velChipTextoAtivo,
-                          ]}
-                        >
-                          {v}x
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
+                  <Text
+                    style={[
+                      styles.velBotaoTexto,
+                      velocidade !== 1 && styles.velBotaoTextoAtivo,
+                    ]}
+                  >
+                    {velocidade}x ▾
+                  </Text>
+                </Pressable>
               </View>
 
               <View style={styles.acoes}>
@@ -327,16 +315,63 @@ export default function PlayerScreen() {
                   <Text style={styles.botaoTexto}>⬇️ Baixar</Text>
                 </Pressable>
                 <Pressable style={styles.botao} onPress={entrarEmPip}>
-                  <Text style={styles.botaoTexto}>🗗 Janela flutuante</Text>
+                  <Text style={styles.botaoTexto}>📱 Miniatura</Text>
                 </Pressable>
                 <Pressable style={styles.botao} onPress={abrirNoVLC}>
                   <Text style={styles.botaoTexto}>🎬 VLC</Text>
                 </Pressable>
               </View>
+
+              <View style={styles.info}>
+                <Text style={styles.tipo}>
+                  {fonte.is_hls ? "Stream HLS" : "Vídeo MP4"}
+                </Text>
+              </View>
             </>
           )}
         </>
       )}
+
+      {/* Seletor de velocidade: lista vertical, como o seletor de faixas —
+          todas as opções visíveis de uma vez, sem arrastar. */}
+      <Modal
+        visible={velocidadeAberta}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setVelocidadeAberta(false)}
+      >
+        <Pressable
+          style={styles.velFundo}
+          onPress={() => setVelocidadeAberta(false)}
+        >
+          <Pressable style={styles.velCaixa} onPress={() => {}}>
+            <Text style={styles.velTitulo}>Velocidade</Text>
+            {VELOCIDADES.map((v) => {
+              const ativo = v === velocidade;
+              return (
+                <Pressable
+                  key={v}
+                  style={[styles.velLinha, ativo && styles.velLinhaAtiva]}
+                  onPress={() => {
+                    setVelocidade(v);
+                    setVelocidadeAberta(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.velLinhaTexto,
+                      ativo && styles.velLinhaTextoAtiva,
+                    ]}
+                  >
+                    {v}x{v === 1 ? "  (normal)" : ""}
+                  </Text>
+                  {ativo && <Text style={styles.velMarca}>✓</Text>}
+                </Pressable>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <ProgressoOverlay
         visivel={dl.ativo}
@@ -358,44 +393,87 @@ const criarEstilos = (cores) =>
   video: { width: "100%", aspectRatio: 16 / 9, backgroundColor: "#000" },
   info: { padding: 16 },
   tipo: { color: cores.textoFraco, fontSize: 13 },
-  pular: {
-    backgroundColor: cores.primaria,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
+  // "Pular abertura" e velocidade dividem uma linha só.
+  linhaReproducao: {
+    flexDirection: "row",
+    gap: 10,
     marginHorizontal: 16,
     marginBottom: 10,
   },
-  pularTexto: { color: cores.sobrePrimaria, fontWeight: "700", fontSize: 15 },
-  velocidade: { marginHorizontal: 16, marginBottom: 12 },
-  velocidadeRotulo: {
-    color: cores.textoFraco,
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    marginBottom: 6,
+  pular: {
+    flex: 1,
+    backgroundColor: cores.primaria,
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  velocidadeOpcoes: { gap: 8, paddingRight: 8 },
-  velChip: {
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    backgroundColor: cores.cartao,
+  pularTexto: { color: cores.sobrePrimaria, fontWeight: "700", fontSize: 15 },
+  // Largura fixa: o rótulo varia ("1x" a "1.75x") e sem isso o botão de
+  // pular mudaria de tamanho a cada troca de velocidade.
+  velBotao: {
+    width: 78,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: cores.cartaoAtivo,
     borderWidth: 1,
     borderColor: cores.borda,
   },
-  velChipAtivo: {
+  // Destaca quando não está em 1x, para não passar despercebido que o
+  // episódio está acelerado.
+  velBotaoAtivo: { borderColor: cores.primaria },
+  velBotaoTexto: { color: cores.texto, fontWeight: "700", fontSize: 14 },
+  velBotaoTextoAtivo: { color: cores.primaria },
+  velFundo: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  velCaixa: {
+    backgroundColor: cores.cartao,
+    borderRadius: 16,
+    padding: 18,
+    width: "70%",
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  velTitulo: {
+    color: cores.texto,
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 10,
+  },
+  velLinha: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: cores.cartaoAtivo,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  velLinhaAtiva: {
     backgroundColor: cores.primaria,
     borderColor: cores.primaria,
   },
-  velChipTexto: { color: cores.textoFraco, fontSize: 13, fontWeight: "600" },
-  velChipTextoAtivo: { color: cores.sobrePrimaria, fontWeight: "700" },
+  velLinhaTexto: { color: cores.texto, fontSize: 15, fontWeight: "600" },
+  velLinhaTextoAtiva: { color: cores.sobrePrimaria, fontWeight: "700" },
+  velMarca: { color: cores.sobrePrimaria, fontWeight: "700", fontSize: 15 },
   navegacao: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     marginHorizontal: 16,
-    marginBottom: 12,
+    // Respiro entre o vídeo e a barra; abaixo dela vem a linha de
+    // reprodução, que já traz a própria margem.
+    marginTop: 12,
+    marginBottom: 10,
   },
   navBotao: {
     flex: 1,
