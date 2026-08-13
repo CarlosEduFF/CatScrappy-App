@@ -41,6 +41,13 @@ export default function ContaScreen() {
             <Text style={styles.botaoEditarTexto}>Editar perfil</Text>
           </Pressable>
 
+          <Pressable
+            style={styles.botaoEditar}
+            onPress={() => router.push("/configuracoes")}
+          >
+            <Text style={styles.botaoEditarTexto}>Configurações</Text>
+          </Pressable>
+
           <Pressable style={styles.botaoSair} onPress={sair}>
             <Text style={styles.botaoSairTexto}>Sair da conta</Text>
           </Pressable>
@@ -61,6 +68,14 @@ export default function ContaScreen() {
 
         <Pressable style={styles.botao} onPress={() => router.push("/login")}>
           <Text style={styles.botaoTexto}>Entrar ou criar conta</Text>
+        </Pressable>
+
+        {/* As preferências do app não dependem de conta. */}
+        <Pressable
+          style={styles.botaoSecundario}
+          onPress={() => router.push("/configuracoes")}
+        >
+          <Text style={styles.botaoSecundarioTexto}>Configurações</Text>
         </Pressable>
       </View>
     </View>
@@ -99,6 +114,15 @@ const criarEstilos = (cores) =>
       alignItems: "center",
     },
     botaoTexto: { color: cores.sobrePrimaria, fontWeight: "700", fontSize: 16 },
+    botaoSecundario: {
+      backgroundColor: cores.cartaoAtivo,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: cores.borda,
+    },
+    botaoSecundarioTexto: { color: cores.texto, fontWeight: "700", fontSize: 16 },
     perfil: { alignItems: "center", gap: 6, marginBottom: 12 },
     avatarFoto: {
       width: 96,

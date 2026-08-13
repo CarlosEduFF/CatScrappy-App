@@ -14,6 +14,7 @@ import {
   AppState,
   Linking,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -26,6 +27,7 @@ import { useDownload } from "../src/useDownload";
 import ProgressoOverlay from "../src/ProgressoOverlay";
 import { vizinhos } from "../src/playlist";
 import { useHistorico } from "../src/useHistorico";
+import { usePreferencias, VELOCIDADES } from "../src/preferencias";
 import { useCores } from "../src/theme";
 
 export default function PlayerScreen() {
@@ -34,6 +36,7 @@ export default function PlayerScreen() {
   const { site, url, titulo, anime, animeUrl } = useLocalSearchParams();
   const router = useRouter();
   const historico = useHistorico({ tipo: "anime", site, itemId: animeUrl });
+  const { saltoAbertura, velocidade, setVelocidade } = usePreferencias();
   const [fonte, setFonte] = useState(null); // { url_player, url_video, is_hls }
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
@@ -105,9 +108,21 @@ export default function PlayerScreen() {
 
   // O player só recebe uma fonte quando ela existir; enquanto isso fica nulo.
   const player = useVideoPlayer(fontePlayer, (p) => {
+    // preservesPitch (padrão do expo-video) corrige o tom da voz em
+    // velocidades diferentes de 1x — sem ele a fala fica aguda demais.
+    p.preservesPitch = true;
     p.play();
   });
 
+  // A velocidade vem do AsyncStorage (assíncrono) e o player é recriado a
+  // cada troca de fonte/episódio: o setup acima roda antes da preferência
+  // chegar e o playbackRate voltaria a 1x. Reaplica sempre que qualquer um
+  // dos dois mudar.
+  useEffect(() => {
+    if (!player) return;
+    const v = Number(velocidade);
+    if (Number.isFinite(v) && v > 0) player.playbackRate = v;
+  }, [player, velocidade, fontePlayer]);
 
   // Fechar a janela do PiP (X) não traz o app de volta: a tela do player
   // continua montada em background e o áudio seguiria tocando invisível.
@@ -118,6 +133,7 @@ export default function PlayerScreen() {
     setEmPip(false);
     if (AppState.currentState !== "active") player.pause();
   }, [player]);
+
   function baixar() {
     dl.rodar(
       (onItem, onProgress, token) =>
@@ -133,6 +149,21 @@ export default function PlayerScreen() {
     );
   }
 
+  // Avança o salto configurado (padrão 90s, o tamanho usual de uma abertura).
+  // Não usa seekBy direto: perto do fim do episódio ele passaria do final e
+  // encerraria a reprodução, então o alvo é limitado à duração conhecida.
+  // duration vem 0 enquanto os metadados não carregaram — nesse caso só
+  // avança e deixa o player resolver.
+  function pularAbertura() {
+    const salto = Number(saltoAbertura) || 90;
+    const fim = Number(player?.duration) || 0;
+    if (fim > 0) {
+      // Uma folga de 1s evita parar exatamente no último frame.
+      player.currentTime = Math.min(player.currentTime + salto, fim - 1);
+    } else {
+      player.seekBy(salto);
+    }
+  }
 
   // Entra em PiP pelo botão. startPictureInPicture() vive no ref do
   // VideoView (não no player) e lança se o aparelho não suportar — daí o
@@ -147,6 +178,7 @@ export default function PlayerScreen() {
       );
     }
   }
+
   async function abrirNoVLC() {
     // O VLC do Android abre URLs de vídeo por intent padrão. Tentamos o
     // esquema vlc:// e caímos para a URL direta se o VLC não estiver instalado.
@@ -250,6 +282,46 @@ export default function PlayerScreen() {
                 </Text>
               </View>
 
+              {/* Linha própria e em destaque: é a ação mais usada durante a
+                  reprodução. A duração vem das configurações. */}
+              <Pressable style={styles.pular} onPress={pularAbertura}>
+                <Text style={styles.pularTexto}>
+                  ⏩ Pular abertura ({saltoAbertura}s)
+                </Text>
+              </Pressable>
+
+              {/* Velocidade: o menu nativo do Android só oferece até 2x e
+                  esquece a escolha a cada episódio. Aqui vai além e a
+                  preferência fica salva. */}
+              <View style={styles.velocidade}>
+                <Text style={styles.velocidadeRotulo}>Velocidade</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.velocidadeOpcoes}
+                >
+                  {VELOCIDADES.map((v) => {
+                    const ativo = v === velocidade;
+                    return (
+                      <Pressable
+                        key={v}
+                        style={[styles.velChip, ativo && styles.velChipAtivo]}
+                        onPress={() => setVelocidade(v)}
+                      >
+                        <Text
+                          style={[
+                            styles.velChipTexto,
+                            ativo && styles.velChipTextoAtivo,
+                          ]}
+                        >
+                          {v}x
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
               <View style={styles.acoes}>
                 <Pressable style={styles.botao} onPress={baixar}>
                   <Text style={styles.botaoTexto}>⬇️ Baixar</Text>
@@ -286,6 +358,38 @@ const criarEstilos = (cores) =>
   video: { width: "100%", aspectRatio: 16 / 9, backgroundColor: "#000" },
   info: { padding: 16 },
   tipo: { color: cores.textoFraco, fontSize: 13 },
+  pular: {
+    backgroundColor: cores.primaria,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginBottom: 10,
+  },
+  pularTexto: { color: cores.sobrePrimaria, fontWeight: "700", fontSize: 15 },
+  velocidade: { marginHorizontal: 16, marginBottom: 12 },
+  velocidadeRotulo: {
+    color: cores.textoFraco,
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  velocidadeOpcoes: { gap: 8, paddingRight: 8 },
+  velChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: cores.cartao,
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  velChipAtivo: {
+    backgroundColor: cores.primaria,
+    borderColor: cores.primaria,
+  },
+  velChipTexto: { color: cores.textoFraco, fontSize: 13, fontWeight: "600" },
+  velChipTextoAtivo: { color: cores.sobrePrimaria, fontWeight: "700" },
   navegacao: {
     flexDirection: "row",
     alignItems: "center",

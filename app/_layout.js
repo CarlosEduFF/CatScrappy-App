@@ -7,6 +7,7 @@ import { TemaProvider, useTema } from "../src/theme";
 import { intervaloRef } from "../src/intervalo";
 import IntervaloModal from "../src/IntervaloModal";
 import { SessaoProvider } from "../src/sessao";
+import { PreferenciasProvider } from "../src/preferencias";
 import BotaoTema from "../src/BotaoTema";
 
 // A navegação em si consome o tema atual (cores do header/fundo e a StatusBar
@@ -35,6 +36,7 @@ function Navegacao() {
         <Stack.Screen name="capitulos" options={{ title: "Capítulos" }} />
         <Stack.Screen name="leitor" options={{ title: "Leitura" }} />
         <Stack.Screen name="perfil" options={{ title: "Editar perfil" }} />
+        <Stack.Screen name="configuracoes" options={{ title: "Configurações" }} />
         <Stack.Screen name="login" options={{ title: "Entrar" }} />
       </Stack>
       {/* Modal de intervalo compartilhado, acionado via pedirIntervalo() */}
@@ -48,10 +50,12 @@ export default function RootLayout() {
     // Raiz de gestos: exigido pelo react-native-gesture-handler para o
     // pinch-to-zoom do leitor de mangá funcionar.
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {/* Tema (claro/escuro/auto) e sessão disponíveis em todo o app. */}
+      {/* Tema (claro/escuro/auto), sessão e preferências em todo o app. */}
       <TemaProvider>
         <SessaoProvider>
-          <Navegacao />
+          <PreferenciasProvider>
+            <Navegacao />
+          </PreferenciasProvider>
         </SessaoProvider>
       </TemaProvider>
     </GestureHandlerRootView>
