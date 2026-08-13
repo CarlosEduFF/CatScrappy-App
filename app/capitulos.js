@@ -23,6 +23,7 @@ import ProgressoOverlay from "../src/ProgressoOverlay";
 import { pedirIntervalo } from "../src/intervalo";
 import BotaoFavorito from "../src/BotaoFavorito";
 import SeletorPagina from "../src/SeletorPagina";
+import { definirPlaylist } from "../src/playlist";
 import { useHistorico } from "../src/useHistorico";
 import { useCores } from "../src/theme";
 
@@ -61,7 +62,20 @@ export default function CapitulosScreen() {
     (async () => {
       try {
         const caps = await listarCapitulos(siteManga, mangaId, idioma);
-        if (ativo) setCapitulos(caps);
+        if (ativo) {
+          setCapitulos(caps);
+          // Publica a lista para o leitor oferecer anterior/próximo. Só os
+          // legíveis: capítulos externos (MangaPlus) abrem no navegador e
+          // nunca entram no leitor, então pular para um deles travaria a
+          // navegação numa tela vazia.
+          definirPlaylist({
+            tipo: "manga",
+            site: siteManga,
+            itemId: mangaId,
+            itens: caps.filter((c) => !c.externo_url),
+            chave: (c) => c.id,
+          });
+        }
         if (ativo && caps.length === 0) {
           setErro(
             idioma === "todos"
@@ -139,13 +153,16 @@ export default function CapitulosScreen() {
     });
     router.push({
       pathname: "/leitor",
-      // "numero" nomeia o PDF e "manga" a subpasta, se baixar pelo leitor.
+      // "numero" nomeia o PDF e "manga" a subpasta, se baixar pelo leitor;
+      // "mangaId" identifica a obra no histórico, para o leitor marcar como
+      // lido ao pular de capítulo.
       params: {
         site: siteManga,
         capituloId: cap.id,
         titulo: rotuloCap(cap),
         numero: cap.numero,
         manga: titulo,
+        mangaId,
       },
     });
   }

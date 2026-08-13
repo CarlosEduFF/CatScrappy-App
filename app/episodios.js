@@ -21,6 +21,7 @@ import { pedirIntervalo } from "../src/intervalo";
 import ProgressoOverlay from "../src/ProgressoOverlay";
 import BotaoFavorito from "../src/BotaoFavorito";
 import SeletorPagina from "../src/SeletorPagina";
+import { definirPlaylist } from "../src/playlist";
 import { useHistorico } from "../src/useHistorico";
 import { useCores } from "../src/theme";
 
@@ -59,7 +60,17 @@ export default function EpisodiosScreen() {
     (async () => {
       try {
         const eps = await listarEpisodios(site, url);
-        if (ativo) setEpisodios(eps);
+        if (ativo) {
+          setEpisodios(eps);
+          // Publica a lista para o player oferecer anterior/próximo.
+          definirPlaylist({
+            tipo: "anime",
+            site,
+            itemId: url,
+            itens: eps,
+            chave: (ep) => ep.url_pagina,
+          });
+        }
       } catch (e) {
         if (ativo) setErro(e.message);
       } finally {
@@ -80,8 +91,15 @@ export default function EpisodiosScreen() {
     });
     router.push({
       pathname: "/player",
-      // "anime" vai junto para o player nomear a subpasta de download.
-      params: { site, url: ep.url_pagina, titulo: ep.titulo, anime: titulo },
+      // "anime" nomeia a subpasta de download; "animeUrl" identifica a série
+      // no histórico, para o player marcar como visto ao pular de episódio.
+      params: {
+        site,
+        url: ep.url_pagina,
+        titulo: ep.titulo,
+        anime: titulo,
+        animeUrl: url,
+      },
     });
   }
 

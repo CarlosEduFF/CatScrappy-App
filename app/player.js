@@ -1,7 +1,6 @@
 // app/player.js — extrai o link e toca no player interno; permite abrir no
-// VLC e baixar o episódio para a pasta do anime.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -11,18 +10,22 @@ import {
   Text,
   View,
 } from "react-native";
-import { useLocalSearchParams, Stack } from "expo-router";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { extrairVideo } from "../src/api";
 import { baixarEpisodios } from "../src/downloads";
 import { useDownload } from "../src/useDownload";
 import ProgressoOverlay from "../src/ProgressoOverlay";
+import { vizinhos } from "../src/playlist";
+import { useHistorico } from "../src/useHistorico";
 import { useCores } from "../src/theme";
 
 export default function PlayerScreen() {
   const cores = useCores();
   const styles = useMemo(() => criarEstilos(cores), [cores]);
-  const { site, url, titulo, anime } = useLocalSearchParams();
+  const { site, url, titulo, anime, animeUrl } = useLocalSearchParams();
+  const router = useRouter();
+  const historico = useHistorico({ tipo: "anime", site, itemId: animeUrl });
   const [fonte, setFonte] = useState(null); // { url_player, url_video, is_hls }
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
@@ -30,6 +33,11 @@ export default function PlayerScreen() {
 
   useEffect(() => {
     let ativo = true;
+    // Trocar de episódio reusa esta tela (router.replace): sem limpar, o
+    // vídeo anterior continuaria visível enquanto o novo é extraído.
+    setFonte(null);
+    setErro(null);
+    setCarregando(true);
     (async () => {
       try {
         const dados = await extrairVideo(site, url);
@@ -44,6 +52,37 @@ export default function PlayerScreen() {
       ativo = false;
     };
   }, [site, url]);
+
+  // Episódio anterior/próximo, vindos da lista publicada pela tela de
+  // episódios. Se a lista não estiver em memória (app restaurado direto
+  // aqui, ou aberto pelo histórico), vem tudo nulo e os botões não aparecem.
+  const irmaos = useMemo(() => vizinhos("anime", site, url), [site, url]);
+
+  // Troca de episódio com replace: empilhar deixaria o "voltar" percorrendo
+  // todos os episódios já assistidos em vez de retornar à lista.
+  const irPara = useCallback(
+    (ep) => {
+      if (!ep) return;
+      // Marca o episódio de destino como visto, igual a abrir pela lista
+      // (idempotente; sem login apenas ignora).
+      historico.marcar({
+        episodio_id: ep.url_pagina,
+        numero: ep.numero || "",
+        titulo: ep.titulo || "",
+      });
+      router.replace({
+        pathname: "/player",
+        params: {
+          site,
+          url: ep.url_pagina,
+          titulo: ep.titulo,
+          anime,
+          animeUrl,
+        },
+      });
+    },
+    [router, site, anime, animeUrl, historico]
+  );
 
   // Fonte do player: alguns sites (AnimeFire) exigem headers (Referer) no
   // request do vídeo — passa-os junto da URI. Sem headers, uma URL simples.
@@ -107,6 +146,49 @@ export default function PlayerScreen() {
         </View>
       )}
 
+      {/* Navegação entre episódios. Fica fora do bloco do vídeo de propósito:
+          quando a extração falha, pular para o próximo é justamente o que
+          resolve. Escondida em PiP e quando a lista não está em memória. */}
+      {!emPip && irmaos.total > 0 && (
+        <View style={styles.navegacao}>
+          <Pressable
+            style={[styles.navBotao, !irmaos.anterior && styles.navBotaoInativo]}
+            disabled={!irmaos.anterior}
+            onPress={() => irPara(irmaos.anterior)}
+          >
+            <Text
+              style={[
+                styles.navTexto,
+                !irmaos.anterior && styles.navTextoInativo,
+              ]}
+              numberOfLines={1}
+            >
+              ⏮ Anterior
+            </Text>
+          </Pressable>
+
+          <Text style={styles.navContador}>
+            {irmaos.indice + 1}/{irmaos.total}
+          </Text>
+
+          <Pressable
+            style={[styles.navBotao, !irmaos.proximo && styles.navBotaoInativo]}
+            disabled={!irmaos.proximo}
+            onPress={() => irPara(irmaos.proximo)}
+          >
+            <Text
+              style={[
+                styles.navTexto,
+                !irmaos.proximo && styles.navTextoInativo,
+              ]}
+              numberOfLines={1}
+            >
+              Próximo ⏭
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
       {fonte && !erro && (
         <>
           <VideoView
@@ -154,6 +236,29 @@ const criarEstilos = (cores) =>
   video: { width: "100%", aspectRatio: 16 / 9, backgroundColor: "#000" },
   info: { padding: 16 },
   tipo: { color: cores.textoFraco, fontSize: 13 },
+  navegacao: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  navBotao: {
+    flex: 1,
+    backgroundColor: cores.cartaoAtivo,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  // Ponta da lista: o botão continua ocupando o lugar (para o contador não
+  // dançar entre os episódios) mas fica apagado e sem toque.
+  navBotaoInativo: { opacity: 0.4 },
+  navTexto: { color: cores.texto, fontWeight: "700", fontSize: 14 },
+  navTextoInativo: { color: cores.textoFraco },
+  navContador: { color: cores.textoFraco, fontSize: 13, fontWeight: "600" },
   acoes: { flexDirection: "row", gap: 10, marginHorizontal: 16 },
   botao: {
     flex: 1,
