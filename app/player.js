@@ -1,9 +1,17 @@
 // app/player.js — extrai o link e toca no player interno; permite abrir no
+// VLC, baixar o episódio para a pasta do anime e assistir em janela
+// flutuante (picture-in-picture).
+//
+// PiP: a prop allowsPictureInPicture do VideoView só tem efeito com o
+// android:supportsPictureInPicture no Manifest, que vem do plugin
+// expo-video configurado em app.json (supportsPictureInPicture: true) —
+// sem ele o modo é silenciosamente ignorado. Requer build nativo novo.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Linking,
   Pressable,
   StyleSheet,
@@ -29,6 +37,8 @@ export default function PlayerScreen() {
   const [fonte, setFonte] = useState(null); // { url_player, url_video, is_hls }
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  const [emPip, setEmPip] = useState(false);
+  const videoRef = useRef(null);
   const dl = useDownload();
 
   useEffect(() => {
@@ -98,6 +108,16 @@ export default function PlayerScreen() {
     p.play();
   });
 
+
+  // Fechar a janela do PiP (X) não traz o app de volta: a tela do player
+  // continua montada em background e o áudio seguiria tocando invisível.
+  // Como não há reprodução em background aqui, pausa nesse caso — mas só
+  // quando o app está mesmo em background, senão isso pausaria também o
+  // retorno normal do PiP para a tela cheia.
+  const aoSairDoPip = useCallback(() => {
+    setEmPip(false);
+    if (AppState.currentState !== "active") player.pause();
+  }, [player]);
   function baixar() {
     dl.rodar(
       (onItem, onProgress, token) =>
@@ -113,6 +133,20 @@ export default function PlayerScreen() {
     );
   }
 
+
+  // Entra em PiP pelo botão. startPictureInPicture() vive no ref do
+  // VideoView (não no player) e lança se o aparelho não suportar — daí o
+  // aviso em vez de derrubar a tela.
+  async function entrarEmPip() {
+    try {
+      await videoRef.current?.startPictureInPicture();
+    } catch {
+      Alert.alert(
+        "Picture-in-picture indisponível",
+        "Este aparelho ou versão do Android não suporta janela flutuante."
+      );
+    }
+  }
   async function abrirNoVLC() {
     // O VLC do Android abre URLs de vídeo por intent padrão. Tentamos o
     // esquema vlc:// e caímos para a URL direta se o VLC não estiver instalado.
@@ -192,27 +226,43 @@ export default function PlayerScreen() {
       {fonte && !erro && (
         <>
           <VideoView
+            ref={videoRef}
             style={styles.video}
             player={player}
             fullscreenOptions={{ enable: true }}
             allowsPictureInPicture
+            // Sair do app (Home/multitarefa) manda o vídeo para a janela
+            // flutuante sozinho, em vez de perder a reprodução. Android 12+;
+            // nas versões antigas só o botão funciona.
+            startsPictureInPictureAutomatically
+            onPictureInPictureStart={() => setEmPip(true)}
+            onPictureInPictureStop={aoSairDoPip}
             nativeControls
           />
 
-          <View style={styles.info}>
-            <Text style={styles.tipo}>
-              {fonte.is_hls ? "Stream HLS" : "Vídeo MP4"}
-            </Text>
-          </View>
+          {/* Em PiP a tela continua montada atrás da janela flutuante; sem
+              isso os botões apareceriam ao voltar para o app por baixo dela. */}
+          {!emPip && (
+            <>
+              <View style={styles.info}>
+                <Text style={styles.tipo}>
+                  {fonte.is_hls ? "Stream HLS" : "Vídeo MP4"}
+                </Text>
+              </View>
 
-          <View style={styles.acoes}>
-            <Pressable style={styles.botao} onPress={baixar}>
-              <Text style={styles.botaoTexto}>⬇️ Baixar</Text>
-            </Pressable>
-            <Pressable style={styles.botao} onPress={abrirNoVLC}>
-              <Text style={styles.botaoTexto}>🎬 Abrir no VLC</Text>
-            </Pressable>
-          </View>
+              <View style={styles.acoes}>
+                <Pressable style={styles.botao} onPress={baixar}>
+                  <Text style={styles.botaoTexto}>⬇️ Baixar</Text>
+                </Pressable>
+                <Pressable style={styles.botao} onPress={entrarEmPip}>
+                  <Text style={styles.botaoTexto}>🗗 Janela flutuante</Text>
+                </Pressable>
+                <Pressable style={styles.botao} onPress={abrirNoVLC}>
+                  <Text style={styles.botaoTexto}>🎬 VLC</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
         </>
       )}
 
@@ -264,10 +314,19 @@ const criarEstilos = (cores) =>
     flex: 1,
     backgroundColor: cores.cartaoAtivo,
     borderRadius: 12,
-    padding: 16,
+    // Menos folga lateral: são três botões na linha e os rótulos não podem
+    // quebrar no meio da palavra em telas estreitas.
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: cores.borda,
   },
-  botaoTexto: { color: cores.texto, fontWeight: "700", fontSize: 15 },
+  botaoTexto: {
+    color: cores.texto,
+    fontWeight: "700",
+    fontSize: 14,
+    textAlign: "center",
+  },
   });
