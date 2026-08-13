@@ -101,6 +101,20 @@ export const SITES_MANGA = [
   { id: "mangaplus", nome: "Manga Plus (oficial, inglês)", url: "https://mangaplus.shueisha.co.jp" },
 ];
 
+// Um item guardado na conta (favorito/histórico) só é exibível se vier de
+// uma fonte que ESTE app conhece. A conta é a mesma em builds diferentes e
+// os dados ficam numa tabela só, então uma build com fontes extras deixaria
+// registros que aqui não abririam — o item apareceria na lista e daria erro
+// ao tocar. A checagem é por lista conhecida (e não por uma lista de
+// bloqueio) para valer também para fontes futuras, sem precisar atualizar.
+const IDS_CONHECIDOS = new Set(
+  [...SITES, ...SITES_MANGA].map((s) => s.id)
+);
+
+export function siteConhecido(site) {
+  return IDS_CONHECIDOS.has(site);
+}
+
 export function buscarManga(site, nome, genero) {
   if (site === "mugiwaras") return mugiwaras.buscarManga(nome);
   if (site === "fliptru") return fliptru.buscarManga(nome);

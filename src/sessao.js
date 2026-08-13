@@ -22,6 +22,7 @@ import {
   listarFavoritos,
   adicionarFavorito,
   removerFavorito,
+  siteConhecido,
 } from "./api";
 
 const CHAVE = "@catscrappy:sessao";
@@ -68,6 +69,13 @@ export function SessaoProvider({ children }) {
     })();
   }, []);
 
+  // Descarta o que veio da conta mas não é abrível por este app: a conta é
+  // compartilhada entre builds e a tabela é uma só, então podem existir
+  // registros de fontes que aqui não existem. Filtrar na entrada (e não em
+  // cada tela) garante que nenhum consumidor de `favoritos` os veja.
+  const soConhecidos = (lista) =>
+    (lista || []).filter((f) => siteConhecido(f.site));
+
   // Sempre que houver token, sincroniza os favoritos do servidor.
   const recarregarFavoritos = useCallback(async () => {
     if (!token) {
@@ -75,7 +83,7 @@ export function SessaoProvider({ children }) {
       return;
     }
     try {
-      setFavoritos(await listarFavoritos(token));
+      setFavoritos(soConhecidos(await listarFavoritos(token)));
     } catch (e) {
       if (e.status !== 401) return;
       // Access token expirado: renova e tenta de novo antes de desistir.
@@ -83,7 +91,7 @@ export function SessaoProvider({ children }) {
       const novo = await renovar();
       if (!novo) return;
       try {
-        setFavoritos(await listarFavoritos(novo));
+        setFavoritos(soConhecidos(await listarFavoritos(novo)));
       } catch (e2) {
         // Falhou mesmo com token novo: mantém os favoritos que já estavam.
       }

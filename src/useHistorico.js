@@ -3,6 +3,11 @@
 // Diferente dos favoritos (lista global pequena), o histórico é grande e por
 // série (One Piece tem 1000+). Então carrega sob demanda os vistos daquela
 // série específica e mantém só esses em memória. Requer login.
+//
+// A conta é compartilhada entre builds, mas aqui não há o risco que existe
+// nos favoritos: a consulta é sempre por (tipo, site, item_id) de uma tela
+// já aberta neste app, e o servidor filtra por esses campos — registros de
+// fontes que este app não tem nunca entram no resultado.
 
 import { useCallback, useEffect, useState } from "react";
 import { useSessao } from "./sessao";
