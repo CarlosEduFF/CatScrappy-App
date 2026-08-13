@@ -10,7 +10,6 @@ import {
   Image,
   Linking,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -23,6 +22,7 @@ import { useDownload } from "../src/useDownload";
 import ProgressoOverlay from "../src/ProgressoOverlay";
 import { pedirIntervalo } from "../src/intervalo";
 import BotaoFavorito from "../src/BotaoFavorito";
+import SeletorPagina from "../src/SeletorPagina";
 import { useHistorico } from "../src/useHistorico";
 import { useCores } from "../src/theme";
 
@@ -264,30 +264,14 @@ export default function CapitulosScreen() {
             autoCorrect={false}
           />
           {!filtro.trim() && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.paginas}
-              contentContainerStyle={styles.paginasConteudo}
-            >
-              {Array.from({ length: totalPaginas }, (_, i) => (
-                <Pressable
-                  key={i}
-                  onPress={() => setPagina(i)}
-                  style={[styles.pagChip, pagina === i && styles.pagChipAtivo]}
-                >
-                  <Text
-                    style={[
-                      styles.pagChipTexto,
-                      pagina === i && styles.pagChipTextoAtivo,
-                    ]}
-                  >
-                    {i * TAM_PAGINA + 1}–
-                    {Math.min((i + 1) * TAM_PAGINA, capitulos.length)}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+            <SeletorPagina
+              pagina={pagina}
+              totalPaginas={totalPaginas}
+              tamanhoPagina={TAM_PAGINA}
+              total={capitulos.length}
+              unidade="Capítulos"
+              onSelecionar={setPagina}
+            />
           )}
           {!!filtro.trim() && (
             <Text style={styles.resultadoBusca}>
@@ -439,24 +423,6 @@ const criarEstilos = (cores) =>
     borderColor: cores.borda,
     marginBottom: 10,
   },
-  // Altura fixa + flexShrink 0: sem isso a FlatList irmã comprime o
-  // ScrollView horizontal e os chips somem.
-  paginas: { flexGrow: 0, flexShrink: 0, height: 38, marginBottom: 12 },
-  paginasConteudo: { gap: 8, alignItems: "center" },
-  pagChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    backgroundColor: cores.cartao,
-    borderWidth: 1,
-    borderColor: cores.borda,
-  },
-  pagChipAtivo: {
-    backgroundColor: cores.primaria,
-    borderColor: cores.primaria,
-  },
-  pagChipTexto: { color: cores.textoFraco, fontSize: 13, fontWeight: "600" },
-  pagChipTextoAtivo: { color: cores.sobrePrimaria },
   resultadoBusca: { color: cores.textoFraco, marginBottom: 10, fontSize: 13 },
   cartao: {
     flexDirection: "row",
