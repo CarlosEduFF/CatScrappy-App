@@ -3,7 +3,6 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useCores } from "../../src/theme";
-import BotaoTema from "../../src/BotaoTema";
 
 export default function TabsLayout() {
   const cores = useCores();
@@ -22,8 +21,6 @@ export default function TabsLayout() {
         },
         tabBarActiveTintColor: cores.primaria,
         tabBarInactiveTintColor: cores.textoFraco,
-        // Botão de tema (claro/escuro) no header das abas.
-        headerRight: () => <BotaoTema />,
       }}
     >
       <Tabs.Screen

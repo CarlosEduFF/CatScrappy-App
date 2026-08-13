@@ -8,7 +8,6 @@ import { intervaloRef } from "../src/intervalo";
 import IntervaloModal from "../src/IntervaloModal";
 import { SessaoProvider } from "../src/sessao";
 import { PreferenciasProvider } from "../src/preferencias";
-import BotaoTema from "../src/BotaoTema";
 
 // A navegação em si consome o tema atual (cores do header/fundo e a StatusBar
 // clara/escura), por isso fica num componente separado dentro do TemaProvider.
@@ -23,8 +22,6 @@ function Navegacao() {
           headerTintColor: cores.texto,
           contentStyle: { backgroundColor: cores.fundo },
           headerShadowVisible: false,
-          // Botão de tema (claro/escuro) presente no header de todas as telas.
-          headerRight: () => <BotaoTema />,
         }}
       >
         {/* As abas (Início/Favoritos/Conta) trazem o próprio header. */}

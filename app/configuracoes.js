@@ -1,8 +1,14 @@
-// app/configuracoes.js — preferências do app.
+// app/configuracoes.js — preferências do app: aparência e player.
 //
-// Hoje só o salto do botão "Pular abertura" do player. As opções cobrem as
-// durações usuais de abertura; o campo livre existe porque algumas séries
-// fogem do padrão (recaps longos, aberturas curtas em episódios especiais).
+// O tema mora aqui (e não mais no ícone do header): trocar de tema é algo
+// que se faz uma vez, e no player/leitor o ícone disputava espaço com o
+// título do episódio. Aqui também cabe o "Automático", que o botão do
+// header não alcançava — uma vez tocado, a preferência ficava fixa para
+// sempre, sem caminho de volta para seguir o sistema.
+//
+// No player, as opções de salto cobrem as durações usuais de abertura; o
+// campo livre existe porque algumas séries fogem do padrão (recaps longos,
+// aberturas curtas em episódios especiais).
 
 import { useMemo, useState } from "react";
 import {
@@ -14,11 +20,19 @@ import {
   View,
 } from "react-native";
 import { SALTOS, VELOCIDADES, usePreferencias } from "../src/preferencias";
-import { useCores } from "../src/theme";
+import { useCores, useTema } from "../src/theme";
+
+// Rótulo + o que cada modo faz, para "Automático" não ficar ambíguo.
+const TEMAS = [
+  { id: "light", nome: "☀️ Claro" },
+  { id: "dark", nome: "🌙 Escuro" },
+  { id: "auto", nome: "⚙️ Automático" },
+];
 
 export default function ConfiguracoesScreen() {
   const cores = useCores();
   const styles = useMemo(() => criarEstilos(cores), [cores]);
+  const { preferencia, setPreferencia, esquemaEfetivo } = useTema();
   const { saltoAbertura, setSaltoAbertura, velocidade, setVelocidade } =
     usePreferencias();
   const [personalizado, setPersonalizado] = useState("");
@@ -33,6 +47,40 @@ export default function ConfiguracoesScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
+      <Text style={styles.secao}>Aparência</Text>
+
+      <View style={styles.cartao}>
+        <Text style={styles.rotulo}>Tema</Text>
+        <Text style={styles.ajuda}>
+          No modo automático o app segue o tema do sistema (claro de dia,
+          escuro à noite, se o aparelho estiver configurado assim).
+        </Text>
+
+        <View style={styles.opcoes}>
+          {TEMAS.map((t) => {
+            const ativo = t.id === preferencia;
+            return (
+              <Pressable
+                key={t.id}
+                style={[styles.chip, ativo && styles.chipAtivo]}
+                onPress={() => setPreferencia(t.id)}
+              >
+                <Text style={[styles.chipTexto, ativo && styles.chipTextoAtivo]}>
+                  {t.nome}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Em "auto" o rótulo sozinho não diz qual tema está valendo. */}
+        <Text style={styles.atual}>
+          {preferencia === "auto"
+            ? `Atual: automático (${esquemaEfetivo === "dark" ? "escuro" : "claro"} agora)`
+            : `Atual: ${preferencia === "dark" ? "escuro" : "claro"}`}
+        </Text>
+      </View>
+
       <Text style={styles.secao}>Player</Text>
 
       <View style={styles.cartao}>
@@ -119,6 +167,8 @@ const criarEstilos = (cores) =>
       textTransform: "uppercase",
       marginBottom: 8,
       marginLeft: 4,
+      // Respiro entre seções (o gap do conteúdo já separa os cartões).
+      marginTop: 6,
     },
     cartao: {
       backgroundColor: cores.cartao,
