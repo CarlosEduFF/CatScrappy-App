@@ -56,10 +56,14 @@ export function SessaoProvider({ children }) {
           refreshRef.current = r || null;
           setToken(t);
           setUsuario(u);
-          // O access_token guardado quase sempre já expirou (dura 1h).
-          // Renova de saída para o app abrir logado; se o refresh falhar,
-          // renovar() encerra a sessão e o usuário entra de novo.
-          if (r) await renovar();
+          // O access_token guardado quase sempre já expirou (dura 1h), então
+          // renova de saída. Sem await: o free tier do Render hiberna e a
+          // primeira chamada pode levar ~30-50s (ou os 90s do timeout) —
+          // esperar aqui seguraria o app na tela de carregando todo esse
+          // tempo. O app abre logado com o que está salvo e o token novo
+          // entra quando chegar; se a credencial tiver mesmo expirado,
+          // renovar() desloga sozinho.
+          if (r) renovar();
         }
       } catch (e) {
         // Sessão corrompida: ignora e segue deslogado.
@@ -129,8 +133,18 @@ export function SessaoProvider({ children }) {
         await persistir(r.access_token, r.usuario || usuario, r.refresh_token);
         return r.access_token;
       } catch (e) {
-        // Refresh inválido/já usado: sessão encerrada de verdade.
-        await sair();
+        // Só encerra a sessão quando o servidor rejeita a credencial: a API
+        // devolve 401 ("Sessão expirada") quando o Supabase recusa o refresh
+        // por inválido/já usado, e 400 quando ele nem foi enviado.
+        //
+        // Todo o resto é transitório e NÃO pode deslogar: sem internet ou
+        // Render hibernando o fetch nem chega a ter status; o timeout de 90s
+        // vira um Error sem status; e uma falha do Supabase chega como 502
+        // (ou 503, se as chaves não estiverem no ambiente). Como sair() apaga
+        // o refresh_token do disco, tratar esses casos como fim de sessão
+        // destruiria a credencial por um problema passageiro — o usuário
+        // perderia o login só por abrir o app offline.
+        if (e.status === 401 || e.status === 400) await sair();
         return null;
       } finally {
         renovacaoRef.current = null;
