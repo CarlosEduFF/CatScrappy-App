@@ -8,6 +8,7 @@ import { intervaloRef } from "../src/intervalo";
 import IntervaloModal from "../src/IntervaloModal";
 import { SessaoProvider } from "../src/sessao";
 import { PreferenciasProvider } from "../src/preferencias";
+import CloudflareModal from "../src/CloudflareModal";
 
 // A navegação em si consome o tema atual (cores do header/fundo e a StatusBar
 // clara/escura), por isso fica num componente separado dentro do TemaProvider.
@@ -38,6 +39,8 @@ function Navegacao() {
       </Stack>
       {/* Modal de intervalo compartilhado, acionado via pedirIntervalo() */}
       <IntervaloModal ref={intervaloRef} />
+      {/* Verificação do Cloudflare (Mugiwaras), acionada via resolverChallenge() */}
+      <CloudflareModal />
     </>
   );
 }

@@ -2,7 +2,8 @@
 //
 // O site fica atrás do Cloudflare, que devolve 403 para IPs de datacenter
 // (o Render, onde a API vive) mas aceita IPs residenciais/móveis — por isso
-// o app fala com o site direto, sem passar pela API do CatScrappy.
+// o app fala com o site direto, sem passar pela API do CatScrappy. Quando o
+// Cloudflare pede verificação humana, ela é resolvida em src/CloudflareModal.js.
 //
 // O site foi reescrito em Next.js e não é mais WordPress/Madara: em vez de
 // raspar HTML, hoje se consome a API JSON pública em app.mugiwarasoficial.com
@@ -11,6 +12,8 @@
 //
 // O id de um mangá é o slug; o de um capítulo é "slug/numero", para que
 // obterPaginas() monte a URL sozinho.
+
+import { resolverChallenge } from "./CloudflareModal";
 
 const BASE = "https://mugiwarasoficial.com";
 const API = "https://app.mugiwarasoficial.com/v1/www";
@@ -22,8 +25,9 @@ const UA =
 // página é o suficiente para trazer obras longas em poucas idas.
 const CAPS_POR_PAGINA = 200;
 
-async function json(caminho) {
-  const resp = await fetch(`${API}${caminho}`, {
+async function json(caminho, tentarChallenge = true) {
+  const url = `${API}${caminho}`;
+  const resp = await fetch(url, {
     headers: {
       "User-Agent": UA,
       Accept: "application/json",
@@ -33,6 +37,17 @@ async function json(caminho) {
       Referer: `${BASE}/`,
     },
   });
+  // Cloudflare pode pedir uma verificação humana; abre o WebView na página do
+  // site (não na URL da API, que é JSON puro e não tem o desafio) para a
+  // pessoa resolver, e o cf_clearance passa a valer para o fetch (mesmo UA e IP).
+  if (
+    tentarChallenge &&
+    resp.status === 403 &&
+    resp.headers.get("cf-mitigated") === "challenge"
+  ) {
+    if (await resolverChallenge(BASE, UA)) return json(caminho, false);
+    throw new Error("Mugiwaras: verificação do site não concluída");
+  }
   if (!resp.ok) throw new Error(`Mugiwaras: erro ${resp.status}`);
   return resp.json();
 }
