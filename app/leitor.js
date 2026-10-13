@@ -7,24 +7,99 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { WebView } from "react-native-webview";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { obterPaginas } from "../src/api";
+import { obterPaginas, obterUrlWeb } from "../src/api";
 import { baixarCapitulos } from "../src/downloads";
 import { useDownload } from "../src/useDownload";
 import ProgressoOverlay from "../src/ProgressoOverlay";
 import PaginaZoom from "../src/PaginaZoom";
+import { useImagemMugiwaras } from "../src/ImagemMugiwaras";
 import { vizinhos } from "../src/playlist";
 import { useHistorico } from "../src/useHistorico";
 import { useCores } from "../src/theme";
 
 const LARGURA = Dimensions.get("window").width;
 
+// Uma página da rolagem. As do Mugiwaras vêm do WebView como data URI (o CDN
+// barra o cliente HTTP do RN); as demais usam a URL direto.
+function Pagina({ uri, site, altura, aoMedir, estilos }) {
+  const { pronta, erro } = useImagemMugiwaras(uri, site);
+  const medirRef = useRef(aoMedir);
+  medirRef.current = aoMedir;
+
+  useEffect(() => {
+    if (pronta && !altura) medirRef.current(pronta);
+  }, [pronta, altura]);
+
+  // Uma página que falhou não pode ficar girando para sempre: o capítulo
+  // continua legível nas outras, então o espaço dela vira um aviso curto.
+  if (erro) {
+    return (
+      <View style={[styles_pagina.falha, { width: LARGURA }]}>
+        <Text style={estilos.aviso}>Página não carregou.</Text>
+      </View>
+    );
+  }
+
+  if (!pronta) {
+    return (
+      <View style={{ width: LARGURA, height: LARGURA * 1.4 }}>
+        <ActivityIndicator style={{ marginTop: 40 }} />
+      </View>
+    );
+  }
+  return (
+    <PaginaZoom
+      uri={pronta}
+      largura={LARGURA}
+      altura={altura || LARGURA * 1.4}
+    />
+  );
+}
+
+const styles_pagina = StyleSheet.create({
+  falha: { paddingVertical: 40, alignItems: "center", justifyContent: "center" },
+});
+
+const JS_ANTI_ADBLOCK = `
+(function () {
+  window.canRunAds = true;
+  window.adBlockerDetected = false;
+  window.google_ad_status = 1;
+  window.adsbygoogle = window.adsbygoogle || [];
+  window.adsbygoogle.loaded = true;
+
+  function neutralizar() {
+    var el = document.querySelectorAll("div, section, dialog, [class*='modal'], [id*='modal']");
+    el.forEach(function (node) {
+      var t = (node.innerText || "").toLowerCase();
+      if ((t.indexOf("bloqueador") !== -1 || t.indexOf("adblock") !== -1 || t.indexOf("premium") !== -1) && t.length < 400) {
+        if (!node.querySelector("img[src*='snipercache']")) {
+          node.style.display = "none";
+          node.style.visibility = "hidden";
+        }
+      }
+    });
+    if (document.body) {
+      document.body.style.overflow = "auto";
+      document.body.style.pointerEvents = "auto";
+    }
+  }
+  neutralizar();
+  setInterval(neutralizar, 400);
+})();
+true;
+`;
+
 export default function LeitorScreen() {
+
   const cores = useCores();
   const styles = useMemo(() => criarEstilos(cores), [cores]);
   const { site, capituloId, titulo, numero, manga, mangaId } =
@@ -35,6 +110,7 @@ export default function LeitorScreen() {
   const [alturas, setAlturas] = useState({});
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  const [usarWebView, setUsarWebView] = useState(false);
   const listaRef = useRef(null);
   const historico = useHistorico({
     tipo: "manga",
@@ -42,6 +118,11 @@ export default function LeitorScreen() {
     itemId: mangaId,
   });
   const dl = useDownload();
+
+  const webUrl = useMemo(
+    () => obterUrlWeb(siteManga, capituloId),
+    [siteManga, capituloId]
+  );
 
   // Capítulo anterior/próximo, vindos da lista publicada pela tela de
   // capítulos. Sem ela em memória (app restaurado direto aqui), vem tudo
@@ -106,16 +187,11 @@ export default function LeitorScreen() {
 
   useEffect(() => {
     let ativo = true;
-    // Trocar de capítulo reusa esta tela (router.replace). Sem limpar, as
-    // páginas antigas continuariam na tela durante o carregamento e as
-    // alturas medidas (indexadas por posição) seriam aplicadas às imagens
-    // novas, deixando cada página com a proporção errada.
     setPaginas([]);
     setAlturas({});
     setErro(null);
     setCarregando(true);
-    // A lista é reusada entre capítulos: sem isso o capítulo novo abriria na
-    // altura de rolagem em que o anterior parou, e não na primeira página.
+    setUsarWebView(false);
     listaRef.current?.scrollToOffset({ offset: 0, animated: false });
     (async () => {
       try {
@@ -133,8 +209,6 @@ export default function LeitorScreen() {
     };
   }, [siteManga, capituloId]);
 
-  // As imagens de mangá têm proporções variadas; medimos cada uma para
-  // exibir na largura da tela mantendo o aspecto.
   function medir(url, i) {
     Image.getSize(
       url,
@@ -145,9 +219,12 @@ export default function LeitorScreen() {
     );
   }
 
-  // Barra de navegação entre capítulos. Vai no rodapé da lista (aparece ao
-  // terminar a leitura, que é quando se quer avançar) e também na tela de
-  // erro — quando um capítulo falha, pular para o próximo é o que resolve.
+  function abrirNavegadorExterno() {
+    if (webUrl) {
+      Linking.openURL(webUrl).catch(() => {});
+    }
+  }
+
   function Navegacao() {
     if (irmaos.total === 0) return null;
     return (
@@ -195,15 +272,63 @@ export default function LeitorScreen() {
     );
   }
 
+
+
+  if (usarWebView && webUrl) {
+    return (
+      <View style={styles.container}>
+        <Stack.Screen options={opcoes} />
+        <WebView
+          source={{ uri: webUrl }}
+          sharedCookiesEnabled
+          thirdPartyCookiesEnabled
+          javaScriptEnabled
+          domStorageEnabled
+          injectedJavaScript={JS_ANTI_ADBLOCK}
+          style={{ flex: 1 }}
+        />
+
+        <View style={styles.barraWeb}>
+          <Pressable style={styles.botaoWebSecundario} onPress={abrirNavegadorExterno}>
+            <Text style={styles.botaoWebTexto}>🌐 Abrir no Navegador</Text>
+          </Pressable>
+        </View>
+        <Navegacao />
+      </View>
+    );
+  }
+
   if (erro) {
     return (
       <View style={styles.centro}>
         <Stack.Screen options={opcoes} />
         <Text style={styles.erro}>{erro}</Text>
+
+        {!!webUrl && (
+          <View style={styles.grupoBotoesWeb}>
+            <Pressable
+              style={styles.botaoWebPrincipal}
+              onPress={() => setUsarWebView(true)}
+            >
+              <Text style={styles.botaoWebTextoPrincipal}>
+                📖 Ler no App (Navegador Integrado)
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.botaoWebSecundario}
+              onPress={abrirNavegadorExterno}
+            >
+              <Text style={styles.botaoWebTexto}>🌐 Abrir no Navegador Externo</Text>
+            </Pressable>
+          </View>
+        )}
+
         <Navegacao />
       </View>
     );
   }
+
 
   return (
     <View style={styles.container}>
@@ -212,16 +337,15 @@ export default function LeitorScreen() {
         ref={listaRef}
         data={paginas}
         keyExtractor={(url, i) => String(i)}
-        renderItem={({ item, index }) => {
-          if (!alturas[index]) medir(item, index);
-          return (
-            <PaginaZoom
-              uri={item}
-              largura={LARGURA}
-              altura={alturas[index] || LARGURA * 1.4}
-            />
-          );
-        }}
+        renderItem={({ item, index }) => (
+          <Pagina
+            uri={item}
+            site={siteManga}
+            altura={alturas[index]}
+            aoMedir={(url) => medir(url, index)}
+            estilos={styles}
+          />
+        )}
         ListFooterComponent={Navegacao}
       />
 
@@ -266,4 +390,46 @@ const criarEstilos = (cores) =>
   navTexto: { color: cores.texto, fontWeight: "700", fontSize: 14 },
   navTextoInativo: { color: cores.textoFraco },
   navContador: { color: cores.textoFraco, fontSize: 13, fontWeight: "600" },
+  grupoBotoesWeb: {
+    width: "100%",
+    paddingHorizontal: 24,
+    gap: 10,
+    marginTop: 8,
+    alignItems: "center",
+  },
+  botaoWebPrincipal: {
+    width: "100%",
+    backgroundColor: cores.primaria,
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  botaoWebTextoPrincipal: {
+    color: cores.sobrePrimaria || "#fff",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  botaoWebSecundario: {
+    width: "100%",
+    backgroundColor: cores.cartaoAtivo,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: cores.borda,
+  },
+  botaoWebTexto: {
+    color: cores.texto,
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  barraWeb: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+    backgroundColor: "#000",
+  },
   });
+
