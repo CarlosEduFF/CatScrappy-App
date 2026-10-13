@@ -3,11 +3,16 @@
 // Uma única notificação persistente (sticky) é atualizada durante o download
 // — assim dá para acompanhar de fora do app — e trocada por um resumo
 // dispensável ao final. Atualizações são limitadas a 1/s para não sobrecarregar
-// o sistema. Se a permissão for negada, tudo aqui vira no-op silencioso
-// (o overlay dentro do app continua funcionando).
+// o sistema. Se a permissão for negada ou rodar no Expo Go (SDK 53+), tudo
+// aqui vira no-op silencioso (o overlay dentro do app continua funcionando).
 
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
+
+const isExpoGo =
+  Constants.appOwnership === "expo" ||
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 const ID = "download-progresso";
 const CANAL = "downloads";
@@ -15,19 +20,23 @@ let pronto = false;
 let ultimoEnvio = 0;
 
 // Sem banner/som a cada atualização: a notificação vive na bandeja.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: false,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+if (!isExpoGo) {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: false,
+        shouldShowList: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    });
+  } catch {}
+}
 
 // Pede permissão (uma vez) e cria o canal Android de importância baixa
 // (sem som/vibração nas atualizações).
 export async function iniciar() {
-  if (pronto) return;
+  if (pronto || isExpoGo) return;
   try {
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync(CANAL, {
@@ -45,7 +54,7 @@ export async function iniciar() {
 const gatilho = Platform.OS === "android" ? { channelId: CANAL } : null;
 
 export async function progresso(rotulo, fracao) {
-  if (!pronto) return;
+  if (!pronto || isExpoGo) return;
   const agora = Date.now();
   if (agora - ultimoEnvio < 1000) return;
   ultimoEnvio = agora;
@@ -66,7 +75,7 @@ export async function progresso(rotulo, fracao) {
 }
 
 export async function concluir(titulo, corpo) {
-  if (!pronto) return;
+  if (!pronto || isExpoGo) return;
   try {
     await Notifications.dismissNotificationAsync(ID);
     await Notifications.scheduleNotificationAsync({
@@ -75,3 +84,4 @@ export async function concluir(titulo, corpo) {
     });
   } catch {}
 }
+
