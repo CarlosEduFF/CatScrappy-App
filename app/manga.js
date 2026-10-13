@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SITES_MANGA, buscarManga, generosManga } from "../src/api";
+import ImagemMugiwaras from "../src/ImagemMugiwaras";
 import { useCores } from "../src/theme";
 
 export default function BuscaMangaScreen() {
@@ -38,9 +40,21 @@ export default function BuscaMangaScreen() {
     setSite(novo);
     setGenero("");
     setSeletorAberto(false);
+    setResultados([]);
+    setErro(null);
   }
 
   async function buscar() {
+    // Sites que abrem diretamente no navegador externo
+    if (siteAtual.navegador) {
+      const url =
+        termo.trim() && siteAtual.buscaUrl
+          ? siteAtual.buscaUrl(termo.trim())
+          : siteAtual.url;
+      if (url) Linking.openURL(url);
+      return;
+    }
+
     // Com gênero é possível buscar sem termo (lista o catálogo do gênero).
     if (!termo.trim() && !genero) return;
     setCarregando(true);
@@ -130,7 +144,9 @@ export default function BuscaMangaScreen() {
           autoCorrect={false}
         />
         <Pressable style={styles.botaoBuscar} onPress={buscar}>
-          <Text style={styles.botaoBuscarTexto}>Buscar</Text>
+          <Text style={styles.botaoBuscarTexto}>
+            {siteAtual.navegador ? "Abrir" : "Buscar"}
+          </Text>
         </Pressable>
       </View>
 
@@ -145,6 +161,15 @@ export default function BuscaMangaScreen() {
           <Text style={styles.seletorValor}>{genero || "Todos"}</Text>
           <Text style={styles.seletorSeta}>▾</Text>
         </Pressable>
+      )}
+
+      {siteAtual.navegador && resultados.length === 0 && !carregando && !erro && (
+        <View style={styles.avisoNavegador}>
+          <Text style={styles.avisoNavegadorTitulo}>🌐 {siteAtual.nome}</Text>
+          <Text style={styles.avisoNavegadorTexto}>
+            Este catálogo é lido diretamente no navegador. Digite o termo de busca e toque em "Abrir", ou toque em "Abrir" com o campo vazio para ir à página inicial.
+          </Text>
+        </View>
       )}
 
       <Modal
@@ -209,7 +234,11 @@ export default function BuscaMangaScreen() {
             onPress={() => abrir(item)}
           >
             {!!item.imagem && (
-              <Image source={{ uri: item.imagem }} style={styles.capa} />
+              <ImagemMugiwaras
+                uri={item.imagem}
+                site={site}
+                style={styles.capa}
+              />
             )}
             <View style={styles.cartaoTextos}>
               <Text style={styles.cartaoTitulo}>{item.titulo}</Text>
@@ -321,4 +350,23 @@ const criarEstilos = (cores) =>
   cartaoTextos: { flex: 1, justifyContent: "center" },
   cartaoTitulo: { color: cores.texto, fontSize: 16, fontWeight: "600" },
   cartaoSinopse: { color: cores.textoFraco, fontSize: 12, marginTop: 6 },
-  });
+  avisoNavegador: {
+    backgroundColor: cores.cartao,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    marginVertical: 12,
+    gap: 6,
+  },
+  avisoNavegadorTitulo: {
+    color: cores.primaria,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  avisoNavegadorTexto: {
+    color: cores.textoFraco,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+});
