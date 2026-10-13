@@ -22,6 +22,7 @@ import ProgressoOverlay from "../src/ProgressoOverlay";
 import BotaoFavorito from "../src/BotaoFavorito";
 import SeletorPagina from "../src/SeletorPagina";
 import { definirPlaylist } from "../src/playlist";
+import { maisRecentesPrimeiro } from "../src/ordem";
 import { useHistorico } from "../src/useHistorico";
 import { useCores } from "../src/theme";
 
@@ -46,7 +47,10 @@ export default function EpisodiosScreen() {
   // ordem crescente de propósito: playlist (anterior/próximo), download de
   // temporada e intervalo dependem dessa ordem, então só a lista na tela
   // é invertida.
-  const recentesPrimeiro = useMemo(() => [...episodios].reverse(), [episodios]);
+  const recentesPrimeiro = useMemo(
+    () => maisRecentesPrimeiro(episodios),
+    [episodios]
+  );
 
   // Com filtro, busca na lista inteira; sem filtro, mostra a página atual.
   const visiveis = useMemo(() => {
