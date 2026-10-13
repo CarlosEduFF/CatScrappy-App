@@ -25,6 +25,7 @@ import BotaoFavorito from "../src/BotaoFavorito";
 import SeletorPagina from "../src/SeletorPagina";
 import ImagemMugiwaras from "../src/ImagemMugiwaras";
 import { definirPlaylist } from "../src/playlist";
+import { maisRecentesPrimeiro } from "../src/ordem";
 import { useHistorico } from "../src/useHistorico";
 import { useCores } from "../src/theme";
 
@@ -95,18 +96,28 @@ export default function CapitulosScreen() {
     };
   }, [siteManga, mangaId, idioma]);
 
+  // Exibição do mais recente para o mais antigo; `capitulos` não muda de
+  // ordem porque playlist e downloads dependem dela.
+  const recentesPrimeiro = useMemo(
+    () => maisRecentesPrimeiro(capitulos),
+    [capitulos]
+  );
+
   // Com filtro, busca na lista inteira; sem filtro, mostra a página atual.
   const visiveis = useMemo(() => {
     const termo = filtro.trim().toLowerCase();
     if (termo) {
-      return capitulos.filter(
+      return recentesPrimeiro.filter(
         (c) =>
           String(c.numero).includes(termo) ||
           (c.titulo || "").toLowerCase().includes(termo)
       );
     }
-    return capitulos.slice(pagina * TAM_PAGINA, (pagina + 1) * TAM_PAGINA);
-  }, [capitulos, filtro, pagina]);
+    return recentesPrimeiro.slice(
+      pagina * TAM_PAGINA,
+      (pagina + 1) * TAM_PAGINA
+    );
+  }, [recentesPrimeiro, filtro, pagina]);
 
   function rotuloCap(c) {
     const base = `Capítulo ${c.numero}`;
@@ -294,6 +305,7 @@ export default function CapitulosScreen() {
               tamanhoPagina={TAM_PAGINA}
               total={capitulos.length}
               unidade="Capítulos"
+              decrescente
               onSelecionar={setPagina}
             />
           )}
