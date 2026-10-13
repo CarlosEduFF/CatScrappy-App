@@ -9,8 +9,12 @@ import * as mugiwaras from "./mugiwaras";
 import * as animefire from "./animefire";
 import * as sushianimes from "./sushianimes";
 import * as animesdigital from "./animesdigital";
+import * as animesonline from "./animesonline";
+import * as topanimes from "./topanimes";
 import * as fliptru from "./fliptru";
 import * as mangaplus from "./mangaplus";
+import * as mangalivre from "./mangalivre";
+import * as iptv from "./iptv";
 
 const BASE_URL =
   Constants.expoConfig?.extra?.apiBaseUrl || "https://catscrappy.onrender.com";
@@ -19,11 +23,11 @@ const BASE_URL =
 // - navegador: o Cloudflare exige um JS challenge que nem o celular resolve
 //   via fetch, então o app abre a busca no navegador externo (buscaUrl).
 export const SITES = [
-  { id: "animefire", nome: "AnimeFire", url: "https://animefire.io" },
   { id: "animesdigital", nome: "AnimesDigital", url: "https://animesdigital.org" },
   { id: "animesonline", nome: "AnimesOnline", url: "https://animesonline.cloud" },
-  { id: "sushianimes", nome: "SushiAnimes", url: "https://sushianimes.com.br" },
   { id: "topanimes", nome: "TopAnimes", url: "https://topanimes.net" },
+  { id: "animefire", nome: "AnimeFire", url: "https://animefire.io" },
+  { id: "sushianimes", nome: "SushiAnimes", url: "https://sushianimes.com.br" },
   { id: "animesdrive", nome: "AnimesDrive (abre no navegador)", url: "https://animesdrive.online",
     navegador: true,
     buscaUrl: (termo) =>
@@ -65,6 +69,8 @@ export function buscarAnime(site, nome, genero) {
   if (site === "animefire") return animefire.buscarAnime(nome, genero);
   if (site === "sushianimes") return sushianimes.buscarAnime(nome);
   if (site === "animesdigital") return animesdigital.buscarAnime(nome);
+  if (site === "animesonline") return animesonline.buscarAnime(nome);
+  if (site === "topanimes") return topanimes.buscarAnime(nome);
   return getJSON("/buscar", { site, nome }).then((d) => d.resultados);
 }
 
@@ -78,27 +84,58 @@ export function listarEpisodios(site, url) {
   if (site === "animefire") return animefire.listarEpisodios(url);
   if (site === "sushianimes") return sushianimes.listarEpisodios(url);
   if (site === "animesdigital") return animesdigital.listarEpisodios(url);
+  if (site === "animesonline") return animesonline.listarEpisodios(url);
+  if (site === "topanimes") return topanimes.listarEpisodios(url);
   return getJSON("/episodios", { site, url }).then((d) => d.episodios);
 }
 
 export function extrairVideo(site, url) {
-  // Retorna { url_video, url_player, is_hls }.
+  // Retorna { url_video, url_player, is_hls, headers }.
   // url_player já é a URL pronta para tocar (proxy quando for MP4).
+  if (site === "iptv") return iptv.extrairVideo(url);
   if (site === "animefire") return animefire.extrairVideo(url);
   if (site === "sushianimes") return sushianimes.extrairVideo(url);
   if (site === "animesdigital") return animesdigital.extrairVideo(url);
+  if (site === "animesonline") return animesonline.extrairVideo(url);
+  if (site === "topanimes") return topanimes.extrairVideo(url);
   return getJSON("/extrair-video", { site, url });
 }
 
 // ------------------------------------------------------------------
 // Mangá — MangaDex e Mugiwaras (One Piece e outros, pt-br)
 // ------------------------------------------------------------------
+export const { listarCategorias: listarCanaisTV, buscarCanais } = iptv;
+
 export const SITES_MANGA = [
   { id: "mangadex", nome: "MangaDex", url: "https://mangadex.org" },
-  { id: "mugiwaras", nome: "Mugiwaras", url: "https://mugiwarasoficial.com" },
-  { id: "mangalivre", nome: "MangaLivre", url: "https://mangalivre.blog" },
+  { id: "mugiwaras", nome: "Mugiwaras", url: "https://mugiwarasoficial.org" },
+  {
+    id: "mangasbrasil",
+    nome: "Mangás Brasil (abre no navegador)",
+    url: "https://mangasbrasil.com.br",
+    navegador: true,
+    buscaUrl: (termo) =>
+      termo ? `https://mangasbrasil.com.br/?s=${encodeURIComponent(termo)}` : "https://mangasbrasil.com.br",
+  },
+  { id: "mangalivre", nome: "MangaLivre", url: "https://mangalivre.to" },
+  {
+    id: "animeallstar",
+    nome: "AnimeAllStar (abre no navegador)",
+    url: "https://animeallstar30.com",
+    navegador: true,
+    buscaUrl: (termo) =>
+      termo ? `https://animeallstar30.com/?s=${encodeURIComponent(termo)}` : "https://animeallstar30.com",
+  },
+  {
+    id: "comick",
+    nome: "Comick (abre no navegador)",
+    url: "https://comick.dev",
+    navegador: true,
+    buscaUrl: (termo) =>
+      termo ? `https://comick.dev/search?q=${encodeURIComponent(termo)}` : "https://comick.dev",
+  },
   { id: "fliptru", nome: "Fliptru (quadrinhos BR indie)", url: "https://fliptru.com.br" },
-  { id: "mangaplus", nome: "Manga Plus (oficial, inglês)", url: "https://mangaplus.shueisha.co.jp" },
+  { id: "mangaplus", nome: "Manga Plus (oficial)", url: "https://mangaplus.shueisha.co.jp" },
 ];
 
 // Um item guardado na conta (favorito/histórico) só é exibível se vier de
@@ -117,8 +154,13 @@ export function siteConhecido(site) {
 
 export function buscarManga(site, nome, genero) {
   if (site === "mugiwaras") return mugiwaras.buscarManga(nome);
+  if (site === "mangalivre") return mangalivre.buscarManga(nome);
   if (site === "fliptru") return fliptru.buscarManga(nome);
   if (site === "mangaplus") return mangaplus.buscarManga(nome);
+  const siteConfig = SITES_MANGA.find((s) => s.id === site);
+  if (siteConfig?.navegador) {
+    throw new Error("Este site abre diretamente no navegador.");
+  }
   const params = { site, nome };
   if (genero) params.genero = genero;
   return getJSON("/manga/buscar", params).then((d) => d.resultados);
@@ -138,6 +180,7 @@ export function generosManga(site) {
 
 export function listarCapitulos(site, mangaId, idioma = "pt-br") {
   if (site === "mugiwaras") return mugiwaras.listarCapitulos(mangaId);
+  if (site === "mangalivre") return mangalivre.listarCapitulos(mangaId);
   if (site === "fliptru") return fliptru.listarCapitulos(mangaId);
   if (site === "mangaplus") return mangaplus.listarCapitulos(mangaId);
   // idioma (só MangaDex): pt-br | en | es-la | ... | "todos"
@@ -148,12 +191,20 @@ export function listarCapitulos(site, mangaId, idioma = "pt-br") {
 
 export function obterPaginas(site, capituloId) {
   if (site === "mugiwaras") return mugiwaras.obterPaginas(capituloId);
+  if (site === "mangalivre") return mangalivre.obterPaginas(capituloId);
   if (site === "fliptru") return fliptru.obterPaginas(capituloId);
   if (site === "mangaplus") return mangaplus.obterPaginas(capituloId);
   return getJSON("/manga/paginas", { site, capitulo_id: capituloId }).then(
     (d) => d.paginas
   );
 }
+
+export function obterUrlWeb(site, capituloId) {
+  if (site === "mugiwaras") return mugiwaras.obterUrlWeb(capituloId);
+  if (site === "mangalivre") return mangalivre.obterUrlWeb(capituloId);
+  return null;
+}
+
 
 // ------------------------------------------------------------------
 // Contas e favoritos — falam com a API, que fala com o Supabase.
