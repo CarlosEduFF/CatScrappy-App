@@ -42,18 +42,27 @@ export default function EpisodiosScreen() {
   const TAM_PAGINA = 50;
   const totalPaginas = Math.ceil(episodios.length / TAM_PAGINA);
 
+  // Exibição do mais recente para o mais antigo. `episodios` continua em
+  // ordem crescente de propósito: playlist (anterior/próximo), download de
+  // temporada e intervalo dependem dessa ordem, então só a lista na tela
+  // é invertida.
+  const recentesPrimeiro = useMemo(() => [...episodios].reverse(), [episodios]);
+
   // Com filtro, busca na lista inteira; sem filtro, mostra a página atual.
   const visiveis = useMemo(() => {
     const termo = filtro.trim().toLowerCase();
     if (termo) {
-      return episodios.filter(
+      return recentesPrimeiro.filter(
         (ep) =>
           ep.titulo.toLowerCase().includes(termo) ||
           String(ep.numero).includes(termo)
       );
     }
-    return episodios.slice(pagina * TAM_PAGINA, (pagina + 1) * TAM_PAGINA);
-  }, [episodios, filtro, pagina]);
+    return recentesPrimeiro.slice(
+      pagina * TAM_PAGINA,
+      (pagina + 1) * TAM_PAGINA
+    );
+  }, [recentesPrimeiro, filtro, pagina]);
 
   useEffect(() => {
     let ativo = true;
@@ -221,6 +230,7 @@ export default function EpisodiosScreen() {
               tamanhoPagina={TAM_PAGINA}
               total={episodios.length}
               unidade="Episódios"
+              decrescente
               onSelecionar={setPagina}
             />
           )}

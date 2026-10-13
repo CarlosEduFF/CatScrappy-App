@@ -19,7 +19,12 @@ import {
 import { useCores } from "./theme";
 
 // Rótulo de uma faixa: "1–50", e no último bloco o total real ("1151–1190").
-function rotuloFaixa(indice, tamanho, total) {
+// Em ordem decrescente (mais recente primeiro) a primeira faixa é a do fim:
+// "1190–1141".
+function rotuloFaixa(indice, tamanho, total, decrescente) {
+  if (decrescente) {
+    return `${total - indice * tamanho}–${Math.max(total - (indice + 1) * tamanho + 1, 1)}`;
+  }
   return `${indice * tamanho + 1}–${Math.min((indice + 1) * tamanho, total)}`;
 }
 
@@ -29,6 +34,7 @@ export default function SeletorPagina({
   tamanhoPagina,
   total,
   unidade = "item",
+  decrescente = false,
   onSelecionar,
 }) {
   const cores = useCores();
@@ -40,7 +46,7 @@ export default function SeletorPagina({
 
   const faixas = Array.from({ length: totalPaginas }, (_, i) => ({
     indice: i,
-    rotulo: rotuloFaixa(i, tamanhoPagina, total),
+    rotulo: rotuloFaixa(i, tamanhoPagina, total, decrescente),
   }));
 
   function escolher(indice) {
@@ -52,7 +58,7 @@ export default function SeletorPagina({
     <>
       <Pressable style={styles.gatilho} onPress={() => setAberto(true)}>
         <Text style={styles.gatilhoRotulo}>
-          {unidade} {rotuloFaixa(pagina, tamanhoPagina, total)}
+          {unidade} {rotuloFaixa(pagina, tamanhoPagina, total, decrescente)}
         </Text>
         <Text style={styles.gatilhoDica}>
           {pagina + 1}/{totalPaginas} ▾
