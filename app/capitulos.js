@@ -23,6 +23,7 @@ import ProgressoOverlay from "../src/ProgressoOverlay";
 import { pedirIntervalo } from "../src/intervalo";
 import BotaoFavorito from "../src/BotaoFavorito";
 import SeletorPagina from "../src/SeletorPagina";
+import ImagemMugiwaras from "../src/ImagemMugiwaras";
 import { definirPlaylist } from "../src/playlist";
 import { useHistorico } from "../src/useHistorico";
 import { useCores } from "../src/theme";
@@ -209,7 +210,13 @@ export default function CapitulosScreen() {
 
       {!carregando && !erro && (!!imagem || !!sinopse) && (
         <View style={styles.ficha}>
-          {!!imagem && <Image source={{ uri: imagem }} style={styles.capa} />}
+          {!!imagem && (
+            <ImagemMugiwaras
+              uri={imagem}
+              site={siteManga}
+              style={styles.capa}
+            />
+          )}
           <View style={styles.fichaTextos}>
             <Text style={styles.contagem}>
               {capitulos.length} capítulo{capitulos.length === 1 ? "" : "s"}

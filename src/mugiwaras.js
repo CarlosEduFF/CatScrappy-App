@@ -1,9 +1,10 @@
-// src/mugiwaras.js — mugiwarasoficial.com consumido NO CELULAR.
+// src/mugiwaras.js — mugiwarasoficial.org consumido NO CELULAR.
 //
 // O site fica atrás do Cloudflare, que devolve 403 para IPs de datacenter
 // (o Render, onde a API vive) mas aceita IPs residenciais/móveis — por isso
-// o app fala com o site direto, sem passar pela API do CatScrappy. Quando o
-// Cloudflare pede verificação humana, ela é resolvida em src/CloudflareModal.js.
+// o app fala com o site direto, sem passar pela API do CatScrappy. O Cloudflare
+// também barra o cliente HTTP do RN, então as chamadas saem de um WebView
+// (ver src/CloudflareModal.js).
 //
 // O site foi reescrito em Next.js e não é mais WordPress/Madara: em vez de
 // raspar HTML, hoje se consome a API JSON pública em app.mugiwarasoficial.com
@@ -13,43 +14,21 @@
 // O id de um mangá é o slug; o de um capítulo é "slug/numero", para que
 // obterPaginas() monte a URL sozinho.
 
-import { resolverChallenge } from "./CloudflareModal";
+import { buscarViaWebView, rasparPaginasViaWebView } from "./CloudflareModal";
+import { base64ParaBytes } from "./pdf";
 
-const BASE = "https://mugiwarasoficial.com";
-const API = "https://app.mugiwarasoficial.com/v1/www";
-const UA =
-  "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) " +
-  "Chrome/126.0 Mobile Safari/537.36";
+
+// O fetch() do RN é barrado pelo Cloudflare (ver CloudflareModal.js), então as
+// chamadas saem do WebView, que é same-origin com a API — daí o caminho ser
+// relativo em vez da URL completa.
+const CAMINHO_API = "/v1/www";
 
 // A API devolve capítulos do mais novo para o mais antigo, paginados; 200 por
 // página é o suficiente para trazer obras longas em poucas idas.
 const CAPS_POR_PAGINA = 200;
 
-async function json(caminho, tentarChallenge = true) {
-  const url = `${API}${caminho}`;
-  const resp = await fetch(url, {
-    headers: {
-      "User-Agent": UA,
-      Accept: "application/json",
-      // A API é aberta, mas o Cloudflare na frente dela é mais tolerante
-      // quando a requisição parece vir do próprio site.
-      Origin: BASE,
-      Referer: `${BASE}/`,
-    },
-  });
-  // Cloudflare pode pedir uma verificação humana; abre o WebView na página do
-  // site (não na URL da API, que é JSON puro e não tem o desafio) para a
-  // pessoa resolver, e o cf_clearance passa a valer para o fetch (mesmo UA e IP).
-  if (
-    tentarChallenge &&
-    resp.status === 403 &&
-    resp.headers.get("cf-mitigated") === "challenge"
-  ) {
-    if (await resolverChallenge(BASE, UA)) return json(caminho, false);
-    throw new Error("Mugiwaras: verificação do site não concluída");
-  }
-  if (!resp.ok) throw new Error(`Mugiwaras: erro ${resp.status}`);
-  return resp.json();
+function json(caminho) {
+  return buscarViaWebView(`${CAMINHO_API}${caminho}`);
 }
 
 // Ids: aceita tanto o slug/"slug/numero" quanto uma URL do site, para não
@@ -119,9 +98,39 @@ export async function listarCapitulos(mangaId) {
   return caps;
 }
 
-// Páginas de um capítulo. As URLs vêm assinadas (?sig=&exp=) com validade de
-// ~9h, então a leitura e o download precisam acontecer na mesma sessão — não
-// dá para guardar o link e reusar depois.
+export function obterUrlWeb(capituloId) {
+  const [slug, numero] = partesDoId(capituloId);
+  if (!slug) return "https://mugiwarasoficial.org";
+  if (!numero) return `https://mugiwarasoficial.org/obra/${slug}`;
+  return `https://mugiwarasoficial.org/obra/${slug}/capitulo/${numero}`;
+}
+
+function tentarDecodificarBase64Url(str) {
+  if (typeof str !== "string") return str;
+  const s = str.trim();
+  if (/^https?:\/\//i.test(s)) return s;
+  try {
+    let b64 = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    const bytes = base64ParaBytes(b64);
+    if (bytes && bytes.length > 0) {
+      let dec = "";
+      for (let i = 0; i < bytes.length; i++) {
+        dec += String.fromCharCode(bytes[i]);
+      }
+      if (dec && (/^https?:\/\//i.test(dec) || dec.includes("/") || dec.includes("."))) {
+        return dec;
+      }
+    }
+  } catch (e) {}
+  return s;
+}
+
+
+// Páginas de um capítulo.
+//
+// O site Mugiwaras protege as imagens do leitor na API (retornando tokens de acesso),
+// exigindo a exibição via navegador ou leitor integrado.
 export async function obterPaginas(capituloId) {
   const [slug, numero] = partesDoId(capituloId);
   if (!slug || !numero) {
@@ -129,11 +138,32 @@ export async function obterPaginas(capituloId) {
       `Mugiwaras: id de capítulo inválido: ${capituloId} (esperado 'slug/numero')`
     );
   }
-  const corpo = await json(
-    `/works/${encodeURIComponent(slug)}/chapters/` +
-      `${encodeURIComponent(numero)}/pages`
-  );
-  return (corpo.data?.pages || [])
-    .map((p) => p.imageUrl)
-    .filter(Boolean);
+
+  let paginas = [];
+  try {
+    const corpo = await json(
+      `/works/${encodeURIComponent(slug)}/chapters/` +
+        `${encodeURIComponent(numero)}/pages`
+    );
+    paginas = corpo.data?.pages || [];
+  } catch (e) {
+    throw new Error(`Mugiwaras: falha ao consultar capítulo (${e.message})`);
+  }
+
+  // Filtra apenas URLs diretas e válidas de imagens (http/https)
+  const urls = paginas
+    .map((p) => (typeof p === "object" && p ? p.imageUrl : null))
+    .filter((u) => u && /^https?:\/\//i.test(u));
+
+  if (!urls.length) {
+    throw new Error(
+      "O Mugiwaras exige visualização diretamente no site oficial para este capítulo."
+    );
+  }
+  return urls;
 }
+
+
+
+
+

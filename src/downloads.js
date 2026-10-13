@@ -27,6 +27,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { copyToSaf } from "../modules/saf-copy";
 import { base64ParaBytes, gerarPdfDeJpegs } from "./pdf";
 import { extrairVideo, obterPaginas } from "./api";
+import { imagemViaWebView } from "./CloudflareModal";
 import { obterSegmentos, resolverUrl } from "./hls";
 
 const SAF = FileSystem.StorageAccessFramework;
@@ -226,6 +227,9 @@ export async function baixarCapitulo(siteManga, cap, onProgress, pastaUri, token
     // manipulator evita reler o arquivo (cujo URI nem sempre é legível pelo
     // file-system).
     const paginasJpeg = [];
+    // Guarda por que a primeira página falhou: quando nenhuma entra, essa é a
+    // única pista do motivo (CDN bloqueado, ponte fora, página 404).
+    let primeiraFalha = null;
     for (let i = 0; i < paginas.length; i++) {
       if (token?.cancelado) throw new Error(CANCELADO);
       const url = paginas[i];
@@ -237,9 +241,20 @@ export async function baixarCapitulo(siteManga, cap, onProgress, pastaUri, token
       // arquivo, imagem que não decodifica) não derruba o capítulo: pula a
       // página, como o próprio site faz.
       try {
-        const resp = await FileSystem.downloadAsync(url, bruto);
-        if (resp.status < 200 || resp.status >= 300) {
-          throw new Error(`HTTP ${resp.status}`);
+        if (siteManga === "mugiwaras") {
+          // O CDN do Mugiwaras barra a pilha HTTP do RN (é a mesma que o
+          // downloadAsync usa), então a página vem pela ponte do WebView como
+          // data URI e é gravada em arquivo para o manipulator ler.
+          const dataUri = await imagemViaWebView(url);
+          const base64 = dataUri.slice(dataUri.indexOf(",") + 1);
+          await FileSystem.writeAsStringAsync(bruto, base64, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+        } else {
+          const resp = await FileSystem.downloadAsync(url, bruto);
+          if (resp.status < 200 || resp.status >= 300) {
+            throw new Error(`HTTP ${resp.status}`);
+          }
         }
         const out = await ImageManipulator.manipulateAsync(
           bruto,
@@ -261,11 +276,16 @@ export async function baixarCapitulo(siteManga, cap, onProgress, pastaUri, token
         });
       } catch (e) {
         if (token?.cancelado) throw new Error(CANCELADO);
+        if (!primeiraFalha) primeiraFalha = e.message;
       }
       onProgress?.(((i + 1) / paginas.length) * 0.8);
     }
     if (!paginasJpeg.length) {
-      throw new Error("Nenhuma página do capítulo pôde ser baixada.");
+      throw new Error(
+        primeiraFalha
+          ? `Nenhuma página do capítulo pôde ser baixada: ${primeiraFalha}`
+          : "Nenhuma página do capítulo pôde ser baixada."
+      );
     }
 
     // 2) Monta o PDF diretamente dos JPEGs e grava no cache.
